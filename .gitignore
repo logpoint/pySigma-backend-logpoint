@@ -1,0 +1,8 @@
+.coverage*
+.idea/
+.vscode/
+**/__pycache__
+.pytest_cache/
+cov.xml
+dist/
+docs/_build
