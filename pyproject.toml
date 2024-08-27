@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "pysigma-backend-logpoint"
+version = "1.0.0"
+description = "pySigma Logpoint backend"
+readme="README.md"
+authors = ["Surya Majhi <sum@logpoint.com>", "Swachchhanda Shrawan Poudel <ssp@logpoint.com>"]
+license = "LGPL-2.1-only"
+repository = "https://github.com/logpoint/pySigma-backend-logpoint"
+packages = [
+    { include = "sigma" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+pysigma = "^0.11.7"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2.2"
+pytest-cov = "^5.0.0"
+coverage = "^7.5.3"
+defusedxml = "^0.7.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
