@@ -1,4 +1,7 @@
 # pySigma Logpoint Backend
+[Tests](https://github.com/logpoint/pySigma-backend-logpoint/actions/workflows/test.yml/badge.svg)
+![Coverage Badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/logpoint/***************/raw/logpoint_pysigma_coverage.json)
+![Status](https://img.shields.io/badge/Status-pre--release-orange)
 
 ## Overview
 This is the Logpoint backend for pySigma. It provides the package `sigma.backends.logpoint` with the `Logpoint` class.
