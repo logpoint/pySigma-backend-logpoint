@@ -15,6 +15,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # otherwise, there would be errors pushing refs to the destination repository.
       - name: Install Poetry
         run: pipx install poetry
       - name: Set up Python
@@ -28,13 +30,17 @@ jobs:
       - name: Store coverage for badge
         if: ${{ runner.os == 'Linux' }}
         run: poetry run python print-coverage.py >> $GITHUB_ENV
-      - name: Create coverage badge
+      - name: Create coverage badge file
         if: ${{ github.repository == 'logpoint/pySigma-backend-logpoint' && github.event_name == 'push' && runner.os == 'Linux' }}
-        uses: schneegans/dynamic-badges-action@v1.7.0
-        with:
-          auth: ${{ secrets.GIST_SECRET }}
-          gistID: empty #needs to be updated
-          filename: logpoint_pysigma_coverage.json
-          label: Coverage
-          message: ${{ env.COVERAGE }}
-          color: ${{ env.COVERAGE_COLOR }}
+        run: |
+          echo "{ \"schemaVersion\": 1, \"label\": \"Coverage\", \"message\": \"${{ env.COVERAGE }}\", \"color\": \"${{ env.COVERAGE_COLOR }}\" }" > coverage-badge.json
+      - name: Commit coverage badge to repository
+        if: ${{ github.repository == 'logpoint/pySigma-backend-logpoint' && github.event_name == 'push' && runner.os == 'Linux' }}
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add coverage-badge.json
+          git commit -m "Update coverage badge"
+          git push origin HEAD:${{ github.head_ref }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.PUSH_TOKEN }}
