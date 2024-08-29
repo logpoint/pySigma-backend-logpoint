@@ -1,6 +1,6 @@
 # pySigma Logpoint Backend
 ![Tests](https://github.com/logpoint/pySigma-backend-logpoint/actions/workflows/test.yml/badge.svg)
-![Coverage Badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/logpoint/***************/raw/logpoint_pysigma_coverage.json)
+![Coverage Badge](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/logpoint/pySigma-backend-logpoint/main/coverage-badge.json)
 ![Status](https://img.shields.io/badge/Status-pre--release-orange)
 
 ## Overview
