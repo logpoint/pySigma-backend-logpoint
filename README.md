@@ -1,4 +1,7 @@
 # pySigma Logpoint Backend
+![Tests](https://github.com/logpoint/pySigma-backend-logpoint/actions/workflows/test.yml/badge.svg)
+![Coverage Badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/logpoint/***************/raw/logpoint_pysigma_coverage.json)
+![Status](https://img.shields.io/badge/Status-pre--release-orange)
 
 ## Overview
 This is the Logpoint backend for pySigma. It provides the package `sigma.backends.logpoint` with the `Logpoint` class.
@@ -102,4 +105,7 @@ This backend is in its preliminary stage, which means there may be issues with q
 This backend is currently maintained by Logpoint, with contributions from the following individuals:
 * [Swachchhanda Shrawan Poudel](https://github.com/swachchhanda000/)
 * [Surya Majhi](https://github.com/suryamajhi)
-* [Bhabesh Raj Rai](https://github.com/d4rk-d4nph3)
+
+## Report Issues
+
+If you encounter any issues, please don't hesitate to [open a new issue](https://github.com/logpoint/pySigma-backend-logpoint/issues/new).
