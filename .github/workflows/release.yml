@@ -1,0 +1,40 @@
+name: Release to PyPI
+on:
+  release:
+    types: [published]
+  push:
+    tags:
+      - v*.*.*
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-20.04
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Poetry
+        run: pipx install poetry
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.11'
+      - name: Verify versioning
+        run: |
+          [ "$(poetry version -s)" == "${GITHUB_REF#refs/tags/v}" ]
+      - name: Install dependencies
+        run: poetry install
+      - name: Run tests
+        run: poetry run pytest
+      - name: Build packages
+        run: poetry build
+      - name: Publish to test PyPI
+        if: ${{ github.event_name == 'push' }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          repository-url: https://test.pypi.org/legacy/
+      # - name: Publish to PyPI
+      #   if: ${{ github.event_name == 'release' }}
+      #   uses: pypa/gh-action-pypi-publish@release/v1

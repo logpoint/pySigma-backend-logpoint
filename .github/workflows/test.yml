@@ -1,0 +1,46 @@
+name: Test
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ 'ubuntu-20.04' ]
+        python-version: [ '3.8', '3.9', '3.10', '3.11', '3.12' ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # otherwise, there would be errors pushing refs to the destination repository.
+      - name: Install Poetry
+        run: pipx install poetry
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: poetry install
+      - name: Run tests
+        run: poetry run pytest --cov=sigma --cov-report term --cov-report xml:cov.xml -vv
+      - name: Store coverage for badge
+        if: ${{ runner.os == 'Linux' }}
+        run: poetry run python print-coverage.py >> $GITHUB_ENV
+      - name: Create coverage badge file
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          echo "{ \"schemaVersion\": 1, \"label\": \"Coverage\", \"message\": \"${{ env.COVERAGE }}\", \"color\": \"${{ env.COVERAGE_COLOR }}\" }" > coverage-badge.json
+      - name: Commit coverage badge to repository
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add coverage-badge.json
+          git commit -m "Update coverage badge"
+          git push origin HEAD:${{ github.head_ref }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.PUSH_TOKEN }}
