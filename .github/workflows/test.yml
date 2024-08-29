@@ -31,11 +31,11 @@ jobs:
         if: ${{ runner.os == 'Linux' }}
         run: poetry run python print-coverage.py >> $GITHUB_ENV
       - name: Create coverage badge file
-        if: ${{ github.repository == 'logpoint/pySigma-backend-logpoint' && github.event_name == 'push' && runner.os == 'Linux' }}
+        if: ${{ runner.os == 'Linux' }}
         run: |
           echo "{ \"schemaVersion\": 1, \"label\": \"Coverage\", \"message\": \"${{ env.COVERAGE }}\", \"color\": \"${{ env.COVERAGE_COLOR }}\" }" > coverage-badge.json
       - name: Commit coverage badge to repository
-        if: ${{ github.repository == 'logpoint/pySigma-backend-logpoint' && github.event_name == 'push' && runner.os == 'Linux' }}
+        if: ${{ runner.os == 'Linux' }}
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
