@@ -35,6 +35,7 @@ jobs:
         run: |
           echo "{ \"schemaVersion\": 1, \"label\": \"Coverage\", \"message\": \"${{ env.COVERAGE }}\", \"color\": \"${{ env.COVERAGE_COLOR }}\" }" > coverage-badge.json
       - name: Commit coverage badge to repository
+        continue-on-error: true
         if: ${{ github.repository == 'logpoint/pySigma-backend-logpoint' && github.event_name == 'push' && runner.os == 'Linux'  }}
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
