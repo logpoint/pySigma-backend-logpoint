@@ -50,7 +50,7 @@ Once the packages are successfully installed, you can convert Sigma rules into L
 [Suspicious Process Masquerading As SvcHost.EXE](https://github.com/SigmaHQ/sigma/blob/598d29f811c1859ba18e05b8c419cc94410c9a55/rules/windows/process_creation/proc_creation_win_svchost_masqueraded_execution.yml)
 
 ```bash
-    sigma convert -t logpoint -p logpoint_windows rules/windows/process_creation/proc_creation_win_svchost_masqueraded_execution.yml
+sigma convert -t logpoint -p logpoint_windows rules/windows/process_creation/proc_creation_win_svchost_masqueraded_execution.yml
 ```
 **Output**
 
