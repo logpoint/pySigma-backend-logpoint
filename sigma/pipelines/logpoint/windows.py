@@ -58,8 +58,8 @@ class SnakeCaseMappingTransformation(FieldMappingTransformationBase):
         super().apply_detection_item(detection_item)
         field = detection_item.field
         mapping = self.get_mapping(field) or self.to_snake_case(field)
-        if mapping is not None and self.processing_item.match_field_name(self.pipeline, field):
-            self.pipeline.field_mappings.add_mapping(field, mapping)
+        if mapping is not None and self.processing_item.match_field_name(self._pipeline, field):
+            self._pipeline.field_mappings.add_mapping(field, mapping)
             if isinstance(mapping, str):  # 1:1 mapping, map field name of detection item directly
                 detection_item.field = mapping
                 self.processing_item_applied(detection_item)
