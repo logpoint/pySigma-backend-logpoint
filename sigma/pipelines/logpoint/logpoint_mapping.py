@@ -81,7 +81,7 @@ logpoint_windows_sysmon_mapping = {
     'LogonId': 'logon_id',
     'OriginalFileName': 'file',
     'ParentCommandLine': 'parent_command',
-    'ParentImage': 'parent_image',
+    'ParentImage': 'parent_process',
     'ParentProcessGuid': 'parent_process_guid',
     'ParentProcessId': 'parent_process_id',
     'ParentUser': 'parent_user',
