@@ -21,22 +21,19 @@ class LogpointDeferredRegularExpression(DeferredTextQueryExpression):
     default_field = "msg"
 
     def finalize_expression(self) -> str:
-        return self.template.format(
-            field=self.field, value=self.value
-        )
+        return self.template.format(field=self.field, value=self.value)
 
 
 class Logpoint(TextQueryBackend):
     """
     Logpoint search query language backend.
     """
+
     # A descriptive name of the backend
     name: ClassVar[str] = "Logpoint Query Language"
     # Output formats provided by the backend as name -> description mapping.
     # The name should match to finalize_output_<name>.
-    formats: ClassVar[Dict[str, str]] = {
-        "default": "Plain Logpoint search queries."
-    }
+    formats: ClassVar[Dict[str, str]] = {"default": "Plain Logpoint search queries."}
     # Does the backend requires that a processing pipeline is provided?
     requires_pipeline: ClassVar[bool] = True
 
@@ -52,7 +49,7 @@ class Logpoint(TextQueryBackend):
     group_expression: ClassVar[str] = "({expr})"
     # parenthesize = True
 
-    token_separator = " "    # separator inserted between all boolean operators
+    token_separator = " "  # separator inserted between all boolean operators
     or_token: ClassVar[str] = "OR"
     and_token: ClassVar[str] = " "
     not_token: ClassVar[str] = "-"
@@ -75,7 +72,6 @@ class Logpoint(TextQueryBackend):
     re_expression: ClassVar[str] = "{regex}"
     # Character used for escaping in regular expressions
     re_escape_char: ClassVar[str] = ""
-
 
     # Numeric comparison operators
     # Compare operation query as format string with placeholders {field}, {operator} and {value}
@@ -120,18 +116,25 @@ class Logpoint(TextQueryBackend):
     # String used as query if final query only contains deferred expression
     deferred_only_query: ClassVar[str] = ""
 
-    def __init__(self,
-                 processing_pipeline: Optional[
-                     "sigma.processing.pipeline.ProcessingPipeline"
-                 ] = None,
-                 collect_errors: bool = False,
-                 output_settings: Dict = {},
-                 **kwargs,
-                 ):
+    def __init__(
+        self,
+        processing_pipeline: Optional[
+            "sigma.processing.pipeline.ProcessingPipeline"
+        ] = None,
+        collect_errors: bool = False,
+        output_settings: Dict = {},
+        **kwargs,
+    ):
         super().__init__(processing_pipeline, collect_errors, **kwargs)
-        self.logpoint_keywords: List[str] = ["process", "filter", "search", "chart", "and", "in", "or"]
-
-
+        self.logpoint_keywords: List[str] = [
+            "process",
+            "filter",
+            "search",
+            "chart",
+            "and",
+            "in",
+            "or",
+        ]
 
     def convert_condition_field_eq_val_re(
         self,
@@ -139,7 +142,11 @@ class Logpoint(TextQueryBackend):
         state: "sigma.conversion.state.ConversionState",
     ) -> ConditionItem:
         """Defer regular expression matching to pipelined regex command after main search expression."""
-        return LogpointDeferredRegularExpression(state, self.escape_and_quote_field(cond.field), super().convert_condition_field_eq_val_re(cond, state)).postprocess(None, cond)
+        return LogpointDeferredRegularExpression(
+            state,
+            self.escape_and_quote_field(cond.field),
+            super().convert_condition_field_eq_val_re(cond, state),
+        ).postprocess(None, cond)
 
     def escape_and_quote_field(self, field_name: str) -> str:
         """
@@ -163,7 +170,9 @@ class Logpoint(TextQueryBackend):
             else:
                 quote = True
 
-            if escaped_field_name.lower() in self.logpoint_keywords:    # quote if field is logpoint's keyword
+            if (
+                escaped_field_name.lower() in self.logpoint_keywords
+            ):  # quote if field is logpoint's keyword
                 quote = True
 
             if quote:  #  ...and quote if pattern (doesn't) matches
@@ -173,5 +182,7 @@ class Logpoint(TextQueryBackend):
     def quote_string(self, s: str) -> str:
         """Put quotes around string."""
         if '"' in s:
-            s = s.replace('\\"', '?')   # " does not work inside double-quoted string. It's a trick to make query work and hopefully that character is ".
+            s = s.replace(
+                '\\"', "?"
+            )  # " does not work inside double-quoted string. It's a trick to make query work and hopefully that character is ".
         return self.str_quote + s + self.str_quote

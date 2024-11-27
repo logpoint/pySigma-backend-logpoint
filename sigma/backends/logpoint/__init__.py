@@ -1,5 +1,3 @@
 from .logpoint import Logpoint
 
-backends = {
-    "logpoint": Logpoint
-}
+backends = {"logpoint": Logpoint}

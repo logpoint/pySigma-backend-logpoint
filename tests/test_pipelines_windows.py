@@ -6,9 +6,9 @@ from sigma.rule import SigmaRule
 
 def test_logpoint_windows():
     assert (
-            Logpoint(logpoint_windows_pipeline()).convert(
-                SigmaCollection.from_yaml(
-                    """
+        Logpoint(logpoint_windows_pipeline()).convert(
+            SigmaCollection.from_yaml(
+                """
                     title: Test
                     status: test
                     logsource:
@@ -22,11 +22,11 @@ def test_logpoint_windows():
                             TargetObject: obj
                         condition: sel
                 """
-                )
             )
-            == [
-                'norm_id="WinServer" event_id=123 image="test.exe" test_field="test" target_object="obj"'
-            ]
+        )
+        == [
+            'norm_id="WinServer" event_id=123 image="test.exe" test_field="test" target_object="obj"'
+        ]
     )
 
 
@@ -52,14 +52,14 @@ def test_logpoint_windows_fields():
         )
     )
 
-    assert rule.fields == ['event_id', 'test_field']
+    assert rule.fields == ["event_id", "test_field"]
 
 
 def test_logpoint_windows_variable_mapping():
     assert (
-            Logpoint(logpoint_windows_pipeline()).convert(
-                SigmaCollection.from_yaml(
-                    """
+        Logpoint(logpoint_windows_pipeline()).convert(
+            SigmaCollection.from_yaml(
+                """
                     title: Test
                     status: test
                     logsource:
@@ -71,17 +71,17 @@ def test_logpoint_windows_variable_mapping():
                             OriginalFileName: test.exe
                         condition: sel
                 """
-                )
             )
-            == ['label="Create" label="Process" command="test" file="test.exe"']
+        )
+        == ['label="Create" label="Process" command="test" file="test.exe"']
     )
 
 
 def test_logpoint_windows_variable_mapping_process_creation():
     assert (
-            Logpoint(logpoint_windows_pipeline()).convert(
-                SigmaCollection.from_yaml(
-                    """
+        Logpoint(logpoint_windows_pipeline()).convert(
+            SigmaCollection.from_yaml(
+                """
                     title: Test
                     status: test
                     logsource:
@@ -95,17 +95,19 @@ def test_logpoint_windows_variable_mapping_process_creation():
                                 - '\cloudflared.exe'
                         condition: sel
                 """
-                )
             )
-            == ['label="Create" label="Process" command="test" file="test.exe" "process"="*\cloudflared.exe"']
+        )
+        == [
+            'label="Create" label="Process" command="test" file="test.exe" "process"="*\cloudflared.exe"'
+        ]
     )
 
 
 def test_logpoint_windows_variable_mapping_driver_loaded():
     assert (
-            Logpoint(logpoint_windows_pipeline()).convert(
-                SigmaCollection.from_yaml(
-                    """
+        Logpoint(logpoint_windows_pipeline()).convert(
+            SigmaCollection.from_yaml(
+                """
                     title: Test
                     status: test
                     logsource:
@@ -119,16 +121,19 @@ def test_logpoint_windows_variable_mapping_driver_loaded():
                                 - '\cloudflared.exe'
                         condition: sel
                 """
-                )
             )
-            == ['label="Load" label="Driver" command="test" file="test.exe" image="*\cloudflared.exe"']
+        )
+        == [
+            'label="Load" label="Driver" command="test" file="test.exe" image="*\cloudflared.exe"'
+        ]
     )
+
 
 def test_logpoint_windows_variable_mapping_registry_event():
     assert (
-            Logpoint(logpoint_windows_pipeline()).convert(
-                SigmaCollection.from_yaml(
-                    """
+        Logpoint(logpoint_windows_pipeline()).convert(
+            SigmaCollection.from_yaml(
+                """
                     title: Esentutl Volume Shadow Copy Service Keys
                     id: 5aad0995-46ab-41bd-a9ff-724f41114971
                     status: test
@@ -153,17 +158,19 @@ def test_logpoint_windows_variable_mapping_registry_event():
                         - Unknown
                     level: high
                 """
-                )
             )
-            == ['event_id IN [12, 13, 14] norm_id="WindowsSysmon" target_object="*System\CurrentControlSet\Services\VSS*" "process"="*esentutl.exe" - target_object="*System\CurrentControlSet\Services\VSS\Start*"']
+        )
+        == [
+            'event_id IN [12, 13, 14] norm_id="WindowsSysmon" target_object="*System\CurrentControlSet\Services\VSS*" "process"="*esentutl.exe" - target_object="*System\CurrentControlSet\Services\VSS\Start*"'
+        ]
     )
 
 
 def test_logpoint_windows_hashes():
     assert (
-            Logpoint(logpoint_windows_pipeline()).convert(
-                SigmaCollection.from_yaml(
-                    """
+        Logpoint(logpoint_windows_pipeline()).convert(
+            SigmaCollection.from_yaml(
+                """
                     title: PUA - Process Hacker Execution
                     date: 2022-10-10
                     modified: 2023-12-11
@@ -192,20 +199,22 @@ def test_logpoint_windows_hashes():
                         - While sometimes 'Process Hacker is used by legitimate administrators, the execution of Process Hacker must be investigated and allowed on a case by case basis
                     level: medium
                 """
-                )
             )
-            == ['label="Create" label="Process" "process"="*undll32.exe" OR hash="68F9B52895F4D34E74112F3129B3B00D" OR '
-                'hash_sha1="A0BDFAC3CE1880B32FF9B696458327CE352E3B1D" OR '
-                'hash_sha256="D4A0FE56316A2C45B9BA9AC1005363309A3EDC7ACF9E4DF64D326A0FF273E80F" OR '
-                'hash_import="3695333C60DEDECDCAFF1590409AA462"']
+        )
+        == [
+            'label="Create" label="Process" "process"="*undll32.exe" OR hash="68F9B52895F4D34E74112F3129B3B00D" OR '
+            'hash_sha1="A0BDFAC3CE1880B32FF9B696458327CE352E3B1D" OR '
+            'hash_sha256="D4A0FE56316A2C45B9BA9AC1005363309A3EDC7ACF9E4DF64D326A0FF273E80F" OR '
+            'hash_import="3695333C60DEDECDCAFF1590409AA462"'
+        ]
     )
 
 
 def test_logpoint_windows_hashes_duplicates():
     assert (
-            Logpoint(logpoint_windows_pipeline()).convert(
-                SigmaCollection.from_yaml(
-                    """
+        Logpoint(logpoint_windows_pipeline()).convert(
+            SigmaCollection.from_yaml(
+                """
                     title: PUA - System Informer Execution
                     id: 5722dff1-4bdd-4949-86ab-fbaf707e767a
                     date: 2023-05-08
@@ -231,14 +240,16 @@ def test_logpoint_windows_hashes_duplicates():
                         - System Informer is regularly used legitimately by system administrators or developers. Apply additional filters accordingly
                     level: medium
                 """
-                )
             )
-            == ['label="Create" label="Process" hash="19426363A37C03C3ED6FEDF57B6696EC*" OR '
-                'hash_sha1="8B12C6DA8FAC0D5E8AB999C31E5EA04AF32D53DC*" OR '
-                'hash_sha256="8EE9D84DE50803545937A63C686822388A3338497CDDB660D5D69CF68B68F287*" '
-                'OR hash_import="B68908ADAEB5D662F87F2528AF318F12*" OR '
-                'hash="19426363A37C03C3ED6FEDF57B6696EC" OR '
-                'hash_sha1="8B12C6DA8FAC0D5E8AB999C31E5EA04AF32D53DC" OR '
-                'hash_sha256="8EE9D84DE50803545937A63C686822388A3338497CDDB660D5D69CF68B68F287" '
-                'OR hash_import="B68908ADAEB5D662F87F2528AF318F12"']
+        )
+        == [
+            'label="Create" label="Process" hash="19426363A37C03C3ED6FEDF57B6696EC*" OR '
+            'hash_sha1="8B12C6DA8FAC0D5E8AB999C31E5EA04AF32D53DC*" OR '
+            'hash_sha256="8EE9D84DE50803545937A63C686822388A3338497CDDB660D5D69CF68B68F287*" '
+            'OR hash_import="B68908ADAEB5D662F87F2528AF318F12*" OR '
+            'hash="19426363A37C03C3ED6FEDF57B6696EC" OR '
+            'hash_sha1="8B12C6DA8FAC0D5E8AB999C31E5EA04AF32D53DC" OR '
+            'hash_sha256="8EE9D84DE50803545937A63C686822388A3338497CDDB660D5D69CF68B68F287" '
+            'OR hash_import="B68908ADAEB5D662F87F2528AF318F12"'
+        ]
     )

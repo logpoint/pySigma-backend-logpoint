@@ -229,9 +229,7 @@ def test_logpoint_filter_null_and(logpoint_backend: Logpoint):
         """
     )
 
-    assert logpoint_backend.convert(rule) == [
-        'FieldA="*valueA" FieldB!=* - FieldB=""'
-    ]
+    assert logpoint_backend.convert(rule) == ['FieldA="*valueA" FieldB!=* - FieldB=""']
 
 
 def test_logpoint_not_filter_null_or(logpoint_backend: Logpoint):
@@ -367,7 +365,9 @@ def test_logpoint_cidr_query(logpoint_backend: Logpoint):
                 condition: sel
         """
     )
-    assert logpoint_backend.convert(rule) == ['field IN ["192.168.*"] OR field IN ["10.*"] fieldB="foo" fieldC="bar"']
+    assert logpoint_backend.convert(rule) == [
+        'field IN ["192.168.*"] OR field IN ["10.*"] fieldB="foo" fieldC="bar"'
+    ]
 
 
 def test_logpoint_regex_query(logpoint_backend: Logpoint):
