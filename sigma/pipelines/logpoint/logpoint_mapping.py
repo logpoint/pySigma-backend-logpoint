@@ -191,7 +191,10 @@ logpoint_windows_sysmon_mapping = {
     'UtcTime': 'utc_ts',
     'client_request_id': 'request_id',
     'GrantedAccess': 'access',
-    'Hash': 'hashes'
+    'MD5': 'hash',
+    'SHA1': 'hash_sha1',
+    'SHA256': 'hash_sha256',
+    'IMPHASH': 'hash_import',
 }
 
 logpoint_windows_security_audit_mapping = {
@@ -2024,7 +2027,6 @@ logpoint_windows_common_taxonomy = {
     "ImageLoaded": "image_loaded",
     "Signed": "is_signed",
     "SignatureStatus": "status",
-    "Imphash": "hash_import",
     "SourceProcessGuid": "source_process_guid",
     "SourceImage": "source_image",
     "SourceThreadId": "source_thread_id",
@@ -2102,7 +2104,15 @@ logpoint_windows_common_taxonomy = {
     'TargetDomainName': 'target_domain',
     'ThreadId': 'thread_id',
     'User': 'user',
-    'WorkstationName': 'workstation'
+    'WorkstationName': 'workstation',
+    'MD5': 'hash',
+    'SHA1': 'hash_sha1',
+    'SHA256': 'hash_sha256',
+    'IMPHASH': 'hash_import',
+    'md5': 'hash',
+    'sha1': 'hash_sha1',
+    'sha256': 'hash_sha256',
+    'Imphash': 'hash_import'
 }
 
 
