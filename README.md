@@ -24,10 +24,10 @@ The Logpoint backend supports the following log sources/rule types:
 #### Requirements
 
 1. To use Sigma CLI (the Sigma Rule Converter) and its underlying library, ensure you have Python version 3.8 or higher installed.
-2. Install dependent **pysigma** verison 0.11.13. Installing other versions may output errors.
+2. Install dependent **pysigma** verison 0.11.18. Installing other versions may output errors.
 
 ```bash
-pip3 install pysigma==0.11.13
+pip3 install pysigma==0.11.18
 ```
 
 3. Install **sigma-cli**, command line tool for sigma rule conversion
