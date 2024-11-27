@@ -10,14 +10,14 @@ from sigma.pipelines.common import logsource_windows_process_creation, logsource
     logsource_windows_registry_delete, logsource_windows_registry_set, logsource_windows_dns_query, \
     logsource_windows_network_connection, logsource_windows_create_remote_thread, logsource_windows_create_stream_hash, \
     logsource_windows_driver_load, logsource_windows_raw_access_thread, logsource_windows_process_access, \
-    logsource_windows_pipe_created, logsource_windows_image_load, logsource_windows, generate_windows_logsource_items
-
+    logsource_windows_pipe_created, logsource_windows_image_load
 from sigma.processing.conditions import (
-    LogsourceCondition, RuleContainsDetectionItemCondition,
+    LogsourceCondition, RuleContainsDetectionItemCondition, IncludeFieldCondition,
 )
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.processing.transformations import (
     FieldMappingTransformationBase, FieldMappingTransformation, AddConditionTransformation,
+    HashesFieldsDetectionItemTransformation,
 )
 from sigma.rule import SigmaDetectionItem, SigmaDetection
 
@@ -131,7 +131,17 @@ def logpoint_windows_pipeline() -> ProcessingPipeline:
         name="Logpoint Windows",
         allowed_backends={"logpoint"},
         priority=20,
-        items= generate_windows_sysmon_enriched_query()
+        items=
+         [
+               ProcessingItem(
+                   field_name_conditions=[IncludeFieldCondition(fields=["Hashes"])],
+                   identifier="logpoint_windows_hashes_field",
+                   transformation=HashesFieldsDetectionItemTransformation(
+                       valid_hash_algos=["MD5", "SHA1", "SHA256", "SHA512", "IMPHASH"]
+                   ),
+               )
+           ]
+        + generate_windows_sysmon_enriched_query()
         + [
                   ProcessingItem(
                       identifier="logpoint_windows_sysmon_image_mapping",
