@@ -450,4 +450,4 @@ def test_logpoint_double_quote_value(logpoint_backend: Logpoint):
         """
     )
 
-    assert logpoint_backend.convert(rule) == ['fieldA="valueA" fieldB="val?ueB"']
+    assert logpoint_backend.convert(rule) == ['fieldA="valueA" fieldB=\'val"ueB\'']

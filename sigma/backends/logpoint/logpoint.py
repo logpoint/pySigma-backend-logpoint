@@ -9,9 +9,14 @@ from sigma.conditions import (
     ConditionFieldEqualsValueExpression,
 )
 from sigma.conversion.base import TextQueryBackend
-from sigma.conversion.deferred import DeferredTextQueryExpression
+from sigma.conversion.deferred import (
+    DeferredTextQueryExpression,
+)
 from sigma.conversion.state import ConversionState
-from sigma.types import SigmaCompareExpression
+from sigma.types import (
+    SigmaCompareExpression,
+    SigmaString,
+)
 
 import sigma
 
@@ -175,14 +180,26 @@ class Logpoint(TextQueryBackend):
             ):  # quote if field is logpoint's keyword
                 quote = True
 
-            if quote:  #  ...and quote if pattern (doesn't) matches
+            if quote:  # ...and quote if pattern (doesn't) matches
                 return self.field_quote + escaped_field_name + self.field_quote
         return escaped_field_name
 
     def quote_string(self, s: str) -> str:
         """Put quotes around string."""
         if '"' in s:
-            s = s.replace(
-                '\\"', "?"
-            )  # " does not work inside double-quoted string. It's a trick to make query work and hopefully that character is ".
+            return "'" + s + "'"
         return self.str_quote + s + self.str_quote
+
+    def convert_value_str(self, s: SigmaString, state: ConversionState) -> str:
+        """Convert a SigmaString into a plain string which can be used in query."""
+        converted = s.convert(
+            self.escape_char,
+            self.wildcard_multi,
+            self.wildcard_single,
+            self.add_escaped,
+            self.filter_chars,
+        )
+        if self.decide_string_quoting(s):
+            return self.quote_string(converted)
+        else:
+            return converted
