@@ -1,5 +1,5 @@
 import re
-from typing import ClassVar, Dict, List, Optional, Pattern, Tuple
+from typing import ClassVar, Dict, List, Optional, Pattern, Tuple, Union
 
 from sigma.conditions import (
     ConditionItem,
@@ -11,11 +11,14 @@ from sigma.conditions import (
 from sigma.conversion.base import TextQueryBackend
 from sigma.conversion.deferred import (
     DeferredTextQueryExpression,
+    DeferredQueryExpression,
 )
 from sigma.conversion.state import ConversionState
 from sigma.types import (
     SigmaCompareExpression,
+    SpecialChars,
     SigmaString,
+    Placeholder,
 )
 
 import sigma
@@ -67,7 +70,7 @@ class Logpoint(TextQueryBackend):
     str_quote_pattern: ClassVar[Pattern] = re.compile(r"^$|.*")
     str_quote_pattern_negation: ClassVar[bool] = False
     # Escaping character for special characters inside string
-    escape_char: ClassVar[str] = "\\"
+    # escape_char: ClassVar[str] = "\\"
 
     # Character used as multi-character wildcard
     wildcard_multi: ClassVar[str] = "*"
@@ -203,3 +206,65 @@ class Logpoint(TextQueryBackend):
             return self.quote_string(converted)
         else:
             return converted
+
+    def convert_condition_field_eq_val_str(
+        self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
+    ) -> Union[str, DeferredQueryExpression]:
+        """Conversion of field = string value expressions"""
+
+        # Manually add wildcard characters for complex json objects like modified properties for now.
+        # modifiedProperties.newValue = "test"
+        # Result: modified_properties = '*"newValue": "test"*'
+        if (
+            self.processing_pipeline
+            and cond.field
+            and "modifiedproperties" in cond.field.lower()
+            and (
+                self.processing_pipeline.name == "Logpoint Azure"
+                or self.processing_pipeline.name == "Logpoint M365"
+            )
+        ):
+            field: str = cond.field.lower()
+            field = field.replace("{}", "")  # Removing {} from the field
+            json_fields: List[str] = field.split(".")
+            required_fields: List[str] = json_fields[
+                json_fields.index("modifiedproperties") + 1 :
+            ]  # fields that are inside of json
+
+            # Replace the taxonomy
+            if self.processing_pipeline.name == "Logpoint Azure":
+                cond.field = "target_modified_property"
+            elif self.processing_pipeline.name == "Logpoint M365":
+                cond.field = "modified_property"
+
+            # Prepare values with json structure
+            sigma_tuple: List[Union[str, SpecialChars, Placeholder]] = list(
+                cond.value.s
+            )
+            if required_fields:
+                sigma_tuple.append('"')
+                sigma_tuple.append(SpecialChars.WILDCARD_MULTI)
+                sigma_tuple.insert(0, '"')
+
+                value_field = required_fields[-1]
+                sigma_tuple.insert(0, " ")
+                sigma_tuple.insert(0, ":")
+                sigma_tuple.insert(0, '"')
+                sigma_tuple.insert(0, value_field)
+                sigma_tuple.insert(0, '"')
+                sigma_tuple.insert(0, SpecialChars.WILDCARD_MULTI)
+
+                remaining_fields = required_fields[:-1]
+                remaining_fields.reverse()
+                for field in remaining_fields:
+                    sigma_tuple.insert(0, '"')
+                    sigma_tuple.insert(0, field)
+                    sigma_tuple.insert(0, '"')
+
+                    sigma_tuple.insert(0, SpecialChars.WILDCARD_MULTI)
+
+                sigma_string = SigmaString()
+                sigma_string.s = tuple(sigma_tuple)
+                cond.value = sigma_string
+
+        return super().convert_condition_field_eq_val_str(cond, state)
