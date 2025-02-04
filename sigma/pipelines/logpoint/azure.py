@@ -5,12 +5,19 @@ from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.processing.transformations import (
     FieldMappingTransformation,
     AddConditionTransformation,
+    FieldFunctionTransformation,
 )
 
 from sigma.pipelines.logpoint.logpoint_mapping import (
     logpoint_azure_mapping,
     logpoint_azure_activity_taxonomy,
 )
+
+
+def azure_field_mapping(field: str):
+    if field.lower().startswith("targetresources.modifiedproperties"):
+        return "target_modified_property." + field
+    return field
 
 
 def logpoint_azure_pipeline() -> ProcessingPipeline:
@@ -69,6 +76,13 @@ def logpoint_azure_pipeline() -> ProcessingPipeline:
                 rule_conditions=[
                     LogsourceCondition(product="azure", service="activitylogs")
                 ],
+            ),
+            ProcessingItem(
+                identifier="logpoint_azure_activity_enrich",
+                transformation=(
+                    FieldFunctionTransformation(transform_func=azure_field_mapping)
+                ),
+                rule_conditions=[LogsourceCondition(product="azure")],
             ),
         ],
     )

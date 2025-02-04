@@ -219,10 +219,6 @@ class Logpoint(TextQueryBackend):
             self.processing_pipeline
             and cond.field
             and "modifiedproperties" in cond.field.lower()
-            and (
-                self.processing_pipeline.name == "Logpoint Azure"
-                or self.processing_pipeline.name == "Logpoint M365"
-            )
         ):
             field: str = cond.field.lower()
             field = field.replace("{}", "")  # Removing {} from the field
@@ -231,11 +227,8 @@ class Logpoint(TextQueryBackend):
                 json_fields.index("modifiedproperties") + 1 :
             ]  # fields that are inside of json
 
-            # Replace the taxonomy
-            if self.processing_pipeline.name == "Logpoint Azure":
-                cond.field = "target_modified_property"
-            elif self.processing_pipeline.name == "Logpoint M365":
-                cond.field = "modified_property"
+            # Reconstruct the taxonomy. It is saving as first parameter from the pipeline.
+            cond.field = json_fields[0]
 
             # Prepare values with json structure
             sigma_tuple: List[Union[str, SpecialChars, Placeholder]] = list(
