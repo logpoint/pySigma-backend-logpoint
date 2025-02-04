@@ -6,7 +6,9 @@ from sigma.conditions import (
     ConditionAND,
     ConditionOR,
     ConditionNOT,
-    ConditionFieldEqualsValueExpression, ConditionType, )
+    ConditionFieldEqualsValueExpression,
+    ConditionType,
+)
 from sigma.conversion.base import TextQueryBackend
 from sigma.conversion.deferred import (
     DeferredTextQueryExpression,
@@ -239,14 +241,16 @@ class Logpoint(TextQueryBackend):
         sigma_string.s = tuple(sigma_tuple)
         return sigma_string
 
-    def modify_condition_from_json_value_construction(self, cond: ConditionFieldEqualsValueExpression):
+    def modify_condition_from_json_value_construction(
+        self, cond: ConditionFieldEqualsValueExpression
+    ):
         if cond.field and "modifiedproperties" in cond.field.lower():
             field: str = cond.field.lower()
             field = field.replace("{}", "")  # Removing {} from the field
             json_fields: List[str] = field.split(".")
             required_fields: List[str] = json_fields[
-                                         json_fields.index("modifiedproperties") + 1:
-                                         ]  # fields that are inside of json
+                json_fields.index("modifiedproperties") + 1 :
+            ]  # fields that are inside of json
 
             cond.field = json_fields[0]
             cond.value = self.construct_sigma_string_for_json_substring(
@@ -254,8 +258,16 @@ class Logpoint(TextQueryBackend):
             )
 
     def convert_condition(self, cond: ConditionType, state: ConversionState) -> Any:
-        if isinstance(cond, ConditionOR) or isinstance(cond, ConditionAND) or isinstance(cond, ConditionNOT):
-            [self.modify_condition_from_json_value_construction(arg) for arg in cond.args if isinstance(arg, ConditionFieldEqualsValueExpression)]
+        if (
+            isinstance(cond, ConditionOR)
+            or isinstance(cond, ConditionAND)
+            or isinstance(cond, ConditionNOT)
+        ):
+            [
+                self.modify_condition_from_json_value_construction(arg)
+                for arg in cond.args
+                if isinstance(arg, ConditionFieldEqualsValueExpression)
+            ]
         elif isinstance(cond, ConditionFieldEqualsValueExpression):
             self.modify_condition_from_json_value_construction(cond)
         return super().convert_condition(cond, state)
