@@ -1,17 +1,15 @@
 import re
-from typing import ClassVar, Dict, List, Optional, Pattern, Tuple, Union
+from typing import ClassVar, Dict, List, Optional, Pattern, Tuple, Union, Any
 
 from sigma.conditions import (
     ConditionItem,
     ConditionAND,
     ConditionOR,
     ConditionNOT,
-    ConditionFieldEqualsValueExpression,
-)
+    ConditionFieldEqualsValueExpression, ConditionType, )
 from sigma.conversion.base import TextQueryBackend
 from sigma.conversion.deferred import (
     DeferredTextQueryExpression,
-    DeferredQueryExpression,
 )
 from sigma.conversion.state import ConversionState
 from sigma.types import (
@@ -235,52 +233,29 @@ class Logpoint(TextQueryBackend):
                 sigma_tuple.insert(0, '"')
                 sigma_tuple.insert(0, field)
                 sigma_tuple.insert(0, '"')
-
                 sigma_tuple.insert(0, SpecialChars.WILDCARD_MULTI)
 
         sigma_string = SigmaString()
         sigma_string.s = tuple(sigma_tuple)
         return sigma_string
 
-    def get_tax_field_and_required_fields(
-        self, cond: ConditionFieldEqualsValueExpression
-    ) -> (str, List[str]):
-        field: str = cond.field.lower()
-        field = field.replace("{}", "")  # Removing {} from the field
-        json_fields: List[str] = field.split(".")
-        required_fields: List[str] = json_fields[
-            json_fields.index("modifiedproperties") + 1 :
-        ]  # fields that are inside of json
-        return json_fields[0], required_fields
-
-    def convert_condition_as_in_expression(
-        self, cond: Union[ConditionOR, ConditionAND], state: ConversionState
-    ) -> Union[str, DeferredQueryExpression]:
-        """Conversion of field in value list conditions."""
-        if cond.args[0].field and "modifiedproperties" in cond.args[0].field.lower():
-            tax_field, required_fields = self.get_tax_field_and_required_fields(
-                cond.args[0]
-            )
-            cond.args[0].field = (
-                tax_field  # Inside gets the field name from first part.
-            )
-            for arg in cond.args:
-                arg.value = self.construct_sigma_string_for_json_substring(
-                    list(arg.value.s), required_fields
-                )
-
-        return super().convert_condition_as_in_expression(cond, state)
-
-    def convert_condition_field_eq_val_str(
-        self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
-    ) -> Union[str, DeferredQueryExpression]:
-        """Conversion of field = string value expressions"""
+    def modify_condition_from_json_value_construction(self, cond: ConditionFieldEqualsValueExpression):
         if cond.field and "modifiedproperties" in cond.field.lower():
-            tax_field, required_fields = self.get_tax_field_and_required_fields(cond)
+            field: str = cond.field.lower()
+            field = field.replace("{}", "")  # Removing {} from the field
+            json_fields: List[str] = field.split(".")
+            required_fields: List[str] = json_fields[
+                                         json_fields.index("modifiedproperties") + 1:
+                                         ]  # fields that are inside of json
 
-            cond.field = tax_field
+            cond.field = json_fields[0]
             cond.value = self.construct_sigma_string_for_json_substring(
                 list(cond.value.s), required_fields
             )
 
-        return super().convert_condition_field_eq_val_str(cond, state)
+    def convert_condition(self, cond: ConditionType, state: ConversionState) -> Any:
+        if isinstance(cond, ConditionOR) or isinstance(cond, ConditionAND) or isinstance(cond, ConditionNOT):
+            [self.modify_condition_from_json_value_construction(arg) for arg in cond.args if isinstance(arg, ConditionFieldEqualsValueExpression)]
+        elif isinstance(cond, ConditionFieldEqualsValueExpression):
+            self.modify_condition_from_json_value_construction(cond)
+        return super().convert_condition(cond, state)
