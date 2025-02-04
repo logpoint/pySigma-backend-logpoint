@@ -19,7 +19,7 @@ def logpoint_m365_pipeline() -> ProcessingPipeline:
             ProcessingItem(
                 identifier="logpoint_m365_taxonomy",
                 transformation=FieldMappingTransformation(logpoint_m365_mapping),
-                rule_conditions=[LogsourceCondition(**{"product": "m365"})],
+                rule_conditions=[LogsourceCondition(product="m365")],
             ),
             ProcessingItem(
                 identifier="logpoint_m365_threat_management",

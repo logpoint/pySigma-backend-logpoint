@@ -29,7 +29,7 @@ def logpoint_azure_pipeline() -> ProcessingPipeline:
                 rule_condition_linking=any,
             ),
             ProcessingItem(
-                identifier="logpoint_azure_taxonomy",
+                identifier="logpoint_azure_activity_taxonomy",
                 transformation=FieldMappingTransformation(
                     logpoint_azure_activity_taxonomy
                 ),
