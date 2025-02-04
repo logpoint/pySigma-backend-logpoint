@@ -2464,6 +2464,7 @@ logpoint_m365_mapping = {
     "workload": "application",
     "Workload": "application",
     "ResultStatus": "status",
+    "Operation": "operation",
 }
 
 # TODO: remove automatic snake conversions after pySigma framework is updated.
@@ -2499,4 +2500,5 @@ logpoint_azure_activity_taxonomy = {
     "operationName": "operation",
     "OperationName": "operation",
     "OperationId": "operation_id",
+    "Operation": "operation",
 }

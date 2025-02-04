@@ -207,57 +207,80 @@ class Logpoint(TextQueryBackend):
         else:
             return converted
 
+    def construct_sigma_string_for_json_substring(
+        self,
+        sigma_tuple: List[Union[str, SpecialChars, Placeholder]],
+        required_fields: List[str],
+    ) -> SigmaString:
+        """Manually add wildcard characters for complex json objects like modified properties for now.
+        modifiedProperties.newValue = "test"
+        Result: modified_properties = '*"newValue": "test"*'
+        """
+        if required_fields:
+            sigma_tuple.append('"')
+            sigma_tuple.append(SpecialChars.WILDCARD_MULTI)
+            sigma_tuple.insert(0, '"')
+
+            value_field = required_fields[-1]
+            sigma_tuple.insert(0, " ")
+            sigma_tuple.insert(0, ":")
+            sigma_tuple.insert(0, '"')
+            sigma_tuple.insert(0, value_field)
+            sigma_tuple.insert(0, '"')
+            sigma_tuple.insert(0, SpecialChars.WILDCARD_MULTI)
+
+            remaining_fields = required_fields[:-1]
+            remaining_fields.reverse()
+            for field in remaining_fields:
+                sigma_tuple.insert(0, '"')
+                sigma_tuple.insert(0, field)
+                sigma_tuple.insert(0, '"')
+
+                sigma_tuple.insert(0, SpecialChars.WILDCARD_MULTI)
+
+        sigma_string = SigmaString()
+        sigma_string.s = tuple(sigma_tuple)
+        return sigma_string
+
+    def get_tax_field_and_required_fields(
+        self, cond: ConditionFieldEqualsValueExpression
+    ) -> (str, List[str]):
+        field: str = cond.field.lower()
+        field = field.replace("{}", "")  # Removing {} from the field
+        json_fields: List[str] = field.split(".")
+        required_fields: List[str] = json_fields[
+            json_fields.index("modifiedproperties") + 1 :
+        ]  # fields that are inside of json
+        return json_fields[0], required_fields
+
+    def convert_condition_as_in_expression(
+        self, cond: Union[ConditionOR, ConditionAND], state: ConversionState
+    ) -> Union[str, DeferredQueryExpression]:
+        """Conversion of field in value list conditions."""
+        if cond.args[0].field and "modifiedproperties" in cond.args[0].field.lower():
+            tax_field, required_fields = self.get_tax_field_and_required_fields(
+                cond.args[0]
+            )
+            cond.args[0].field = (
+                tax_field  # Inside gets the field name from first part.
+            )
+            for arg in cond.args:
+                arg.value = self.construct_sigma_string_for_json_substring(
+                    list(arg.value.s), required_fields
+                )
+
+        return super().convert_condition_as_in_expression(cond, state)
+
     def convert_condition_field_eq_val_str(
         self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:
         """Conversion of field = string value expressions"""
+        if cond.field and "modifiedproperties" in cond.field.lower():
+            tax_field, required_fields = self.get_tax_field_and_required_fields(cond)
 
-        # Manually add wildcard characters for complex json objects like modified properties for now.
-        # modifiedProperties.newValue = "test"
-        # Result: modified_properties = '*"newValue": "test"*'
-        if (
-            self.processing_pipeline
-            and cond.field
-            and "modifiedproperties" in cond.field.lower()
-        ):
-            field: str = cond.field.lower()
-            field = field.replace("{}", "")  # Removing {} from the field
-            json_fields: List[str] = field.split(".")
-            required_fields: List[str] = json_fields[
-                json_fields.index("modifiedproperties") + 1 :
-            ]  # fields that are inside of json
-
-            # Reconstruct the taxonomy. It is saving as first parameter from the pipeline.
-            cond.field = json_fields[0]
-
-            # Prepare values with json structure
-            sigma_tuple: List[Union[str, SpecialChars, Placeholder]] = list(
-                cond.value.s
+            cond.field = tax_field
+            cond.value = self.construct_sigma_string_for_json_substring(
+                list(cond.value.s), required_fields
             )
-            if required_fields:
-                sigma_tuple.append('"')
-                sigma_tuple.append(SpecialChars.WILDCARD_MULTI)
-                sigma_tuple.insert(0, '"')
-
-                value_field = required_fields[-1]
-                sigma_tuple.insert(0, " ")
-                sigma_tuple.insert(0, ":")
-                sigma_tuple.insert(0, '"')
-                sigma_tuple.insert(0, value_field)
-                sigma_tuple.insert(0, '"')
-                sigma_tuple.insert(0, SpecialChars.WILDCARD_MULTI)
-
-                remaining_fields = required_fields[:-1]
-                remaining_fields.reverse()
-                for field in remaining_fields:
-                    sigma_tuple.insert(0, '"')
-                    sigma_tuple.insert(0, field)
-                    sigma_tuple.insert(0, '"')
-
-                    sigma_tuple.insert(0, SpecialChars.WILDCARD_MULTI)
-
-                sigma_string = SigmaString()
-                sigma_string.s = tuple(sigma_tuple)
-                cond.value = sigma_string
 
         return super().convert_condition_field_eq_val_str(cond, state)
