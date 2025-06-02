@@ -2457,3 +2457,48 @@ windows_sysmon_label_mapping = {
     "sysmon_error": {"label": ("Service", "Error")},
     "file_event": {"label": ("File", "Create", "Overwrite")},
 }
+
+logpoint_m365_mapping = {
+    "eventSource": "event_source",
+    "eventName": "alert_name",
+    "workload": "application",
+    "Workload": "application",
+    "ResultStatus": "status",
+    "Operation": "operation",
+}
+
+# TODO: remove automatic snake conversions after pySigma framework is updated.
+logpoint_azure_mapping = {
+    "Status": "status",
+    "Location": "region",
+    "ResultStatus": "result_status",
+    "AuthenticationRequirement": "authentication_requirement",
+    "HomeTenantId": "home_tenant_id",
+    "ResourceTenantId": "resource_tenant_id",
+    "ResultType": "result_type",
+    "AppId": "app_id",
+    "userAgent": "user_agent",
+    "ResourceDisplayName": "resource_display_name",
+    "ConditionalAccessStatus": "conditional_access_status",
+    "NetworkLocationDetails": "network_location_details",
+    "ResultDescription": "description",
+    "properties.message": "operation",  # TODO: doubt-full conversion
+    "OperationName": "operation",
+    "Category": "event_category",
+    "ActivityDisplayName": "activity",
+    "activityType": "activity_type",
+    "targetResources.type": "target_type",
+    "TargetResources.type": "target_type",
+    "LoggedByService": "service",
+}
+
+logpoint_azure_activity_taxonomy = {
+    "CategoryValue": "event_category",
+    "ResourceProviderValue": "resource",
+    "ResourceId": "resource_id",
+    "OperationNameValue": "operation",
+    "operationName": "operation",
+    "OperationName": "operation",
+    "OperationId": "operation_id",
+    "Operation": "operation",
+}

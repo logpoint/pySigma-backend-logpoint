@@ -161,6 +161,7 @@ def logpoint_windows_pipeline() -> ProcessingPipeline:
                 transformation=HashesFieldsDetectionItemTransformation(
                     valid_hash_algos=["MD5", "SHA1", "SHA256", "SHA512", "IMPHASH"]
                 ),
+                rule_conditions=[LogsourceCondition(product="windows")],
             )
         ]
         + generate_windows_sysmon_enriched_query()

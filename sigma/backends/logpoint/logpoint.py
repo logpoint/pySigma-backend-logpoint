@@ -1,5 +1,5 @@
 import re
-from typing import ClassVar, Dict, List, Optional, Pattern, Tuple
+from typing import ClassVar, Dict, List, Optional, Pattern, Tuple, Union, Any
 
 from sigma.conditions import (
     ConditionItem,
@@ -7,11 +7,19 @@ from sigma.conditions import (
     ConditionOR,
     ConditionNOT,
     ConditionFieldEqualsValueExpression,
+    ConditionType,
 )
 from sigma.conversion.base import TextQueryBackend
-from sigma.conversion.deferred import DeferredTextQueryExpression
+from sigma.conversion.deferred import (
+    DeferredTextQueryExpression,
+)
 from sigma.conversion.state import ConversionState
-from sigma.types import SigmaCompareExpression
+from sigma.types import (
+    SigmaCompareExpression,
+    SpecialChars,
+    SigmaString,
+    Placeholder,
+)
 
 import sigma
 
@@ -62,7 +70,7 @@ class Logpoint(TextQueryBackend):
     str_quote_pattern: ClassVar[Pattern] = re.compile(r"^$|.*")
     str_quote_pattern_negation: ClassVar[bool] = False
     # Escaping character for special characters inside string
-    escape_char: ClassVar[str] = "\\"
+    # escape_char: ClassVar[str] = "\\"
 
     # Character used as multi-character wildcard
     wildcard_multi: ClassVar[str] = "*"
@@ -175,14 +183,91 @@ class Logpoint(TextQueryBackend):
             ):  # quote if field is logpoint's keyword
                 quote = True
 
-            if quote:  #  ...and quote if pattern (doesn't) matches
+            if quote:  # ...and quote if pattern (doesn't) matches
                 return self.field_quote + escaped_field_name + self.field_quote
         return escaped_field_name
 
     def quote_string(self, s: str) -> str:
         """Put quotes around string."""
         if '"' in s:
-            s = s.replace(
-                '\\"', "?"
-            )  # " does not work inside double-quoted string. It's a trick to make query work and hopefully that character is ".
+            return "'" + s + "'"
         return self.str_quote + s + self.str_quote
+
+    def convert_value_str(self, s: SigmaString, state: ConversionState) -> str:
+        """Convert a SigmaString into a plain string which can be used in query."""
+        converted = s.convert(
+            self.escape_char,
+            self.wildcard_multi,
+            self.wildcard_single,
+            self.add_escaped,
+            self.filter_chars,
+        )
+        if self.decide_string_quoting(s):
+            return self.quote_string(converted)
+        else:
+            return converted
+
+    def construct_sigma_string_for_json_substring(
+        self,
+        sigma_tuple: List[Union[str, SpecialChars, Placeholder]],
+        required_fields: List[str],
+    ) -> SigmaString:
+        """Manually add wildcard characters for complex json objects like modified properties for now.
+        modifiedProperties.newValue = "test"
+        Result: modified_properties = '*"newValue": "test"*'
+        """
+        if required_fields:
+            sigma_tuple.append('"')
+            sigma_tuple.append(SpecialChars.WILDCARD_MULTI)
+            sigma_tuple.insert(0, '"')
+
+            value_field = required_fields[-1]
+            sigma_tuple.insert(0, " ")
+            sigma_tuple.insert(0, ":")
+            sigma_tuple.insert(0, '"')
+            sigma_tuple.insert(0, value_field)
+            sigma_tuple.insert(0, '"')
+            sigma_tuple.insert(0, SpecialChars.WILDCARD_MULTI)
+
+            remaining_fields = required_fields[:-1]
+            remaining_fields.reverse()
+            for field in remaining_fields:
+                sigma_tuple.insert(0, '"')
+                sigma_tuple.insert(0, field)
+                sigma_tuple.insert(0, '"')
+                sigma_tuple.insert(0, SpecialChars.WILDCARD_MULTI)
+
+        sigma_string = SigmaString()
+        sigma_string.s = tuple(sigma_tuple)
+        return sigma_string
+
+    def modify_condition_from_json_value_construction(
+        self, cond: ConditionFieldEqualsValueExpression
+    ):
+        if cond.field and "modifiedproperties" in cond.field.lower():
+            field: str = cond.field.lower()
+            field = field.replace("{}", "")  # Removing {} from the field
+            json_fields: List[str] = field.split(".")
+            required_fields: List[str] = json_fields[
+                json_fields.index("modifiedproperties") + 1 :
+            ]  # fields that are inside of json
+
+            cond.field = json_fields[0]
+            cond.value = self.construct_sigma_string_for_json_substring(
+                list(cond.value.s), required_fields
+            )
+
+    def convert_condition(self, cond: ConditionType, state: ConversionState) -> Any:
+        if (
+            isinstance(cond, ConditionOR)
+            or isinstance(cond, ConditionAND)
+            or isinstance(cond, ConditionNOT)
+        ):
+            [
+                self.modify_condition_from_json_value_construction(arg)
+                for arg in cond.args
+                if isinstance(arg, ConditionFieldEqualsValueExpression)
+            ]
+        elif isinstance(cond, ConditionFieldEqualsValueExpression):
+            self.modify_condition_from_json_value_construction(cond)
+        return super().convert_condition(cond, state)

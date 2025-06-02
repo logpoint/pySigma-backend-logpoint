@@ -16,6 +16,8 @@ The Logpoint backend supports the following log sources/rule types:
 
 - **Windows Sysmon**
 - **Windows**
+- **Azure**
+- **M365**
 
 ## Usage example
 
