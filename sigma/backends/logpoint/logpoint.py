@@ -258,16 +258,24 @@ class Logpoint(TextQueryBackend):
             )
 
     def convert_condition(self, cond: ConditionType, state: ConversionState) -> Any:
-        if (
-            isinstance(cond, ConditionOR)
-            or isinstance(cond, ConditionAND)
-            or isinstance(cond, ConditionNOT)
-        ):
-            [
-                self.modify_condition_from_json_value_construction(arg)
-                for arg in cond.args
-                if isinstance(arg, ConditionFieldEqualsValueExpression)
-            ]
+
+        if isinstance(cond, (ConditionOR, ConditionAND)):
+            for arg in cond.args:
+                if isinstance(arg, ConditionFieldEqualsValueExpression):
+                    self.modify_condition_from_json_value_construction(arg)
+
         elif isinstance(cond, ConditionFieldEqualsValueExpression):
             self.modify_condition_from_json_value_construction(cond)
+
+        elif isinstance(cond, ConditionNOT):
+            for arg in cond.args:
+                if isinstance(arg, ConditionFieldEqualsValueExpression):
+                    self.modify_condition_from_json_value_construction(arg)
+
+            inner_node = cond.args[0]
+            inner = super().convert_condition(inner_node, state).strip()
+            inner = f"({inner})"
+            return f"-{inner}"
+
+
         return super().convert_condition(cond, state)
