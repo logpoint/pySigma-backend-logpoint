@@ -2380,6 +2380,7 @@ logpoint_windows_common_taxonomy = {
     "FileName": "file",
     "FlagsHex": "flag",
     "HostApplication": "application",
+    "AppName": "application",
     "HostId": "host_id",
     "IpAddress": "source_address",
     "IpPort": "source_port",
