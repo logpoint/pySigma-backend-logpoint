@@ -2460,12 +2460,16 @@ windows_sysmon_label_mapping = {
 }
 
 logpoint_m365_mapping = {
-    "eventSource": "event_source",
+    "Application": "application_id",
+	"eventSource": "event_source",
     "eventName": "alert_name",
     "workload": "application",
     "Workload": "application",
     "ResultStatus": "status",
-    "Operation": "operation",
+    "ObjectId": "object_id",
+	"Operation": "action",
+	"ResultStatus": "status",
+	"RequestType": "request_type",
 }
 
 # TODO: remove automatic snake conversions after pySigma framework is updated.
