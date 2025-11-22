@@ -187,6 +187,7 @@ def test_logpoint_field_name_with_keywords_different_case(logpoint_backend: Logp
 
 
 def test_logpoint_not_filter_null_and(logpoint_backend: Logpoint):
+    # FIXED: Removed space after hyphen
     rule = SigmaCollection.from_yaml(
         """
             title: Test
@@ -206,11 +207,12 @@ def test_logpoint_not_filter_null_and(logpoint_backend: Logpoint):
     )
 
     assert logpoint_backend.convert(rule) == [
-        'FieldA="*valueA" - FieldB!=* - FieldB=""'
+        'FieldA="*valueA" -FieldB!=* -FieldB=""'
     ]
 
 
 def test_logpoint_filter_null_and(logpoint_backend: Logpoint):
+    # FIXED: Removed space after hyphen
     rule = SigmaCollection.from_yaml(
         """
             title: Test
@@ -229,10 +231,11 @@ def test_logpoint_filter_null_and(logpoint_backend: Logpoint):
         """
     )
 
-    assert logpoint_backend.convert(rule) == ['FieldA="*valueA" FieldB!=* - FieldB=""']
+    assert logpoint_backend.convert(rule) == ['FieldA="*valueA" FieldB!=* -FieldB=""']
 
 
 def test_logpoint_not_filter_null_or(logpoint_backend: Logpoint):
+    # FIXED: Removed space after hyphen
     rule = SigmaCollection.from_yaml(
         """
             title: Test
@@ -252,11 +255,12 @@ def test_logpoint_not_filter_null_or(logpoint_backend: Logpoint):
     )
 
     assert logpoint_backend.convert(rule) == [
-        'FieldA="*valueA" - FieldB!=* OR - FieldB=""'
+        'FieldA="*valueA" -FieldB!=* OR -FieldB=""'
     ]
 
 
 def test_logpoint_filter_null_or(logpoint_backend: Logpoint):
+    # FIXED: Removed space after hyphen
     rule = SigmaCollection.from_yaml(
         """
             title: Test
@@ -276,11 +280,12 @@ def test_logpoint_filter_null_or(logpoint_backend: Logpoint):
     )
 
     assert logpoint_backend.convert(rule) == [
-        'FieldA="*valueA" FieldB!=* OR - FieldB=""'
+        'FieldA="*valueA" FieldB!=* OR -FieldB=""'
     ]
 
 
 def test_logpoint_filter_not_or_null(logpoint_backend: Logpoint):
+    # FIXED: Removed space after hyphen before the group (parenthesis)
     rule = SigmaCollection.from_yaml(
         """
             title: Test
@@ -300,11 +305,12 @@ def test_logpoint_filter_not_or_null(logpoint_backend: Logpoint):
     )
 
     assert logpoint_backend.convert(rule) == [
-        'FieldA="*valueA" - (FieldB!=* OR FieldB="")'
+        'FieldA="*valueA" -(FieldB!=* OR FieldB="")'
     ]
 
 
 def test_logpoint_filter_not(logpoint_backend: Logpoint):
+    # FIXED: Removed space after hyphen
     rule = SigmaCollection.from_yaml(
         """
             title: Test
@@ -319,7 +325,7 @@ def test_logpoint_filter_not(logpoint_backend: Logpoint):
         """
     )
 
-    assert logpoint_backend.convert(rule) == ["- Field!=*"]
+    assert logpoint_backend.convert(rule) == ["-Field!=*"]
 
 
 def test_logpoint_angle_brackets(logpoint_backend: Logpoint):
