@@ -272,25 +272,22 @@ class Logpoint(TextQueryBackend):
         elif isinstance(cond, ConditionFieldEqualsValueExpression):
             self.modify_condition_from_json_value_construction(cond)
         return super().convert_condition(cond, state)
-        
+
     def convert_condition_not(
-            self, cond: ConditionNOT, state: ConversionState
-        ) -> Union[str, DeferredQueryExpression]:
-            """Conversion of NOT conditions."""
-            arg = cond.args[0]
-            try:
-                if (
-                    arg.__class__ in self.precedence
-                ):  # group if AND or OR condition is negated
-                    grouped = self.convert_condition_group(arg, state)
-                    return self.not_token + grouped.lstrip()
-                
-                expr = self.convert_condition(arg, state)
-                if isinstance(
-                    expr, DeferredQueryExpression
-                ):  # negate deferred expression and pass it to parent
-                    return expr.negate()
-                
-                return self.not_token + str(expr).lstrip()  # convert negated expression to string
-            except TypeError:  # pragma: no cover
-                raise NotImplementedError("Operator 'not' not supported by the backend")
+        self, cond: ConditionNOT, state: ConversionState
+    ) -> Union[str, DeferredQueryExpression]:
+        """Conversion of NOT conditions."""
+        arg = cond.args[0]
+        try:
+            if (
+                arg.__class__ in self.precedence
+            ):  # group if AND or OR condition is negated
+                return self.not_token + self.convert_condition_group(arg, state)
+            expr = self.convert_condition(arg, state)
+            if isinstance(
+                expr, DeferredQueryExpression
+            ):  # negate deferred expression and pass it to parent
+                return expr.negate()
+            return self.not_token + expr  # convert negated expression to string
+        except TypeError:  # pragma: no cover
+            raise NotImplementedError("Operator 'not' not supported by the backend")
