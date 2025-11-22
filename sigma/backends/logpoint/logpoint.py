@@ -286,7 +286,7 @@ class Logpoint(TextQueryBackend):
             expr = self.convert_condition(arg, state)
             if isinstance(
                 expr, DeferredQueryExpression
-            ):  # negate deferred expression and pass it to parent
+            ):  # negate deferred expression and return for later resolution in the calling context
                 return expr.negate()
             return self.not_token + expr  # convert negated expression to string
         except TypeError:  # pragma: no cover
