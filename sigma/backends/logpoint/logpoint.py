@@ -11,6 +11,7 @@ from sigma.conditions import (
 )
 from sigma.conversion.base import TextQueryBackend
 from sigma.conversion.deferred import (
+    DeferredQueryExpression,
     DeferredTextQueryExpression,
 )
 from sigma.conversion.state import ConversionState
@@ -271,3 +272,22 @@ class Logpoint(TextQueryBackend):
         elif isinstance(cond, ConditionFieldEqualsValueExpression):
             self.modify_condition_from_json_value_construction(cond)
         return super().convert_condition(cond, state)
+
+    def convert_condition_not(
+        self, cond: ConditionNOT, state: ConversionState
+    ) -> Union[str, DeferredQueryExpression]:
+        """Conversion of NOT conditions."""
+        arg = cond.args[0]
+        try:
+            if (
+                arg.__class__ in self.precedence
+            ):  # group if AND or OR condition is negated
+                return self.not_token + self.convert_condition_group(arg, state)
+            expr = self.convert_condition(arg, state)
+            if isinstance(
+                expr, DeferredQueryExpression
+            ):  # negate deferred expression and return for later resolution in the calling context
+                return expr.negate()
+            return self.not_token + expr  # convert negated expression to string
+        except TypeError:  # pragma: no cover
+            raise NotImplementedError("Operator 'not' not supported by the backend")
