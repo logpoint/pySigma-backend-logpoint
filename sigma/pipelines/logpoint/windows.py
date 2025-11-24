@@ -32,7 +32,6 @@ from sigma.processing.conditions import (
 )
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.processing.transformations import (
-    FieldMappingTransformationBase,
     FieldMappingTransformation,
     AddConditionTransformation,
     HashesFieldsDetectionItemTransformation,
@@ -50,7 +49,7 @@ from sigma.pipelines.logpoint.logpoint_mapping import (
 
 
 @dataclass
-class SnakeCaseMappingTransformation(FieldMappingTransformationBase):
+class SnakeCaseMappingTransformation(FieldMappingTransformation):
     """Map a field name to one or multiple different."""
 
     mapping: Dict[str, Union[str, List[str]]]
@@ -83,9 +82,7 @@ class SnakeCaseMappingTransformation(FieldMappingTransformationBase):
         super().apply_detection_item(detection_item)
         field = detection_item.field
         mapping = self.get_mapping(field) or self.to_snake_case(field)
-        if mapping is not None and self.processing_item.match_field_name(
-            self._pipeline, field
-        ):
+        if mapping is not None and self.processing_item.match_field_name(field):
             self._pipeline.field_mappings.add_mapping(field, mapping)
             if isinstance(
                 mapping, str
