@@ -1,18 +1,17 @@
 from typing import Dict, Union, List, ClassVar, Pattern
 import re
+import dataclasses
 from dataclasses import dataclass
-
 
 from sigma.processing.conditions import LogsourceCondition
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.processing.transformations import (
-    FieldMappingTransformationBase,
     FieldMappingTransformation,
-    AddConditionTransformation,
 )
-from sigma.rule import SigmaDetectionItem, SigmaDetection
-from sigma.conditions import ConditionOR
-import dataclasses
+
+# Import base Transformation explicitly
+from sigma.processing.transformations.base import Transformation
+from sigma.rule import SigmaDetectionItem
 
 from sigma.pipelines.logpoint.logpoint_mapping import (
     logpoint_linux_auditd_mapping,
@@ -21,8 +20,13 @@ from sigma.pipelines.logpoint.logpoint_mapping import (
 
 
 @dataclass
-class SnakeCaseMappingTransformation(FieldMappingTransformationBase):
-    """Map a field name to one or multiple different."""
+class SnakeCaseMappingTransformation(Transformation):
+    """
+    Map a field name to one or multiple different fields using a dictionary,
+    or fallback to converting the field name to snake_case if not found.
+
+    Compatible with pySigma v1.0.0.
+    """
 
     mapping: Dict[str, Union[str, List[str]]]
     _re_to_snake_case: ClassVar[Pattern] = re.compile(
@@ -30,14 +34,7 @@ class SnakeCaseMappingTransformation(FieldMappingTransformationBase):
     )
 
     def to_snake_case(self, key):
-        """_to_snake_case converts the fields to snake_case
-
-        Args:
-            key (str): field name in any other case
-
-        Returns:
-            snake_case (str): filed name converted to the snake_case
-        """
+        """Convert field name to snake_case."""
         words = self._re_to_snake_case.findall(key)
         if len(words) > 1:
             snake_case = "_".join(words).lower()
@@ -46,40 +43,63 @@ class SnakeCaseMappingTransformation(FieldMappingTransformationBase):
         return snake_case
 
     def get_mapping(self, field: str) -> Union[None, str, List[str]]:
+        # 1. Check explicit mapping
         if field in self.mapping:
-            mapping = self.mapping[field]
-            return mapping
+            return self.mapping[field]
+        # 2. Fallback to snake_case conversion
+        return self.to_snake_case(field)
 
-    def apply_detection_item(self, detection_item: SigmaDetectionItem):
-        super().apply_detection_item(detection_item)
+    def apply(self, rule) -> None:
+        """
+        Entry point for pySigma 1.0.0.
+        Iterates over all detections and applies the field mapping.
+        """
+        if not rule.detection or not rule.detection.detections:
+            return
+
+        # Iterate over named detections (e.g., 'selection', 'filter')
+        for detection in rule.detection.detections.values():
+            new_detection_items = []
+
+            # Process every item in the detection
+            for detection_item in detection.detection_items:
+                result = self.transform_detection_item(detection_item)
+
+                # If the result is a list (1-to-Many mapping), extend the items
+                if isinstance(result, list):
+                    new_detection_items.extend(result)
+                else:
+                    new_detection_items.append(result)
+
+            # Replace the detection items with the transformed list
+            detection.detection_items = new_detection_items
+
+    def transform_detection_item(
+        self, detection_item: SigmaDetectionItem
+    ) -> Union[SigmaDetectionItem, List[SigmaDetectionItem]]:
         field = detection_item.field
-        mapping = self.get_mapping(field) or self.to_snake_case(field)
-        if mapping is not None and self.processing_item.match_field_name(
-            self._pipeline, field
-        ):
-            self._pipeline.field_mappings.add_mapping(field, mapping)
-            if isinstance(
-                mapping, str
-            ):  # 1:1 mapping, map field name of detection item directly
-                detection_item.field = mapping
-                self.processing_item_applied(detection_item)
-            else:
-                return SigmaDetection(
-                    [
-                        dataclasses.replace(
-                            detection_item, field=field, auto_modifiers=False
-                        )
-                        for field in mapping
-                    ],
-                    item_linking=ConditionOR,
-                )
+        # If no field name (e.g., keyword search), skip
+        if not field:
+            return detection_item
 
-    def apply_field_name(self, field: str) -> Union[str, List[str]]:
-        mapping = self.get_mapping(field) or self.to_snake_case(field)
-        if isinstance(mapping, str):
-            return [mapping]
-        else:
-            return mapping
+        target = self.get_mapping(field)
+
+        # Case 1: 1:1 Mapping (String)
+        if isinstance(target, str):
+            detection_item.field = target
+            return detection_item
+
+        # Case 2: 1:N Mapping (List of strings)
+        # Expands one item into multiple items (one for each new field name)
+        elif isinstance(target, list):
+            expanded_items = []
+            for new_field in target:
+                # Create a copy of the item for each mapped field
+                new_item = dataclasses.replace(detection_item, field=new_field)
+                expanded_items.append(new_item)
+            return expanded_items
+
+        return detection_item
 
 
 def logpoint_linux_pipeline() -> ProcessingPipeline:
