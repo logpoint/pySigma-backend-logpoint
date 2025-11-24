@@ -45,7 +45,9 @@ def logpoint_m365_pipeline() -> ProcessingPipeline:
             ProcessingItem(
                 identifier="logpoint_azure_activity_enrich",
                 transformation=(
-                    FieldFunctionTransformation(transform_func=m365_field_mapping)
+                    FieldFunctionTransformation(
+                        mapping={}, transform_func=m365_field_mapping
+                    )
                 ),
                 rule_conditions=[LogsourceCondition(product="m365")],
             ),
