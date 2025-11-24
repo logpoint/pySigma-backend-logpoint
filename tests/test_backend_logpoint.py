@@ -206,7 +206,7 @@ def test_logpoint_not_filter_null_and(logpoint_backend: Logpoint):
     )
 
     assert logpoint_backend.convert(rule) == [
-        'FieldA="*valueA" - FieldB!=* - FieldB=""'
+        'FieldA="*valueA" -FieldB!=* -FieldB=""'
     ]
 
 
@@ -229,7 +229,7 @@ def test_logpoint_filter_null_and(logpoint_backend: Logpoint):
         """
     )
 
-    assert logpoint_backend.convert(rule) == ['FieldA="*valueA" FieldB!=* - FieldB=""']
+    assert logpoint_backend.convert(rule) == ['FieldA="*valueA" FieldB!=* -FieldB=""']
 
 
 def test_logpoint_not_filter_null_or(logpoint_backend: Logpoint):
@@ -252,7 +252,7 @@ def test_logpoint_not_filter_null_or(logpoint_backend: Logpoint):
     )
 
     assert logpoint_backend.convert(rule) == [
-        'FieldA="*valueA" - FieldB!=* OR - FieldB=""'
+        'FieldA="*valueA" -FieldB!=* OR -FieldB=""'
     ]
 
 
@@ -276,7 +276,7 @@ def test_logpoint_filter_null_or(logpoint_backend: Logpoint):
     )
 
     assert logpoint_backend.convert(rule) == [
-        'FieldA="*valueA" FieldB!=* OR - FieldB=""'
+        'FieldA="*valueA" FieldB!=* OR -FieldB=""'
     ]
 
 
@@ -300,7 +300,7 @@ def test_logpoint_filter_not_or_null(logpoint_backend: Logpoint):
     )
 
     assert logpoint_backend.convert(rule) == [
-        'FieldA="*valueA" - (FieldB!=* OR FieldB="")'
+        'FieldA="*valueA" -(FieldB!=* OR FieldB="")'
     ]
 
 
@@ -319,7 +319,7 @@ def test_logpoint_filter_not(logpoint_backend: Logpoint):
         """
     )
 
-    assert logpoint_backend.convert(rule) == ["- Field!=*"]
+    assert logpoint_backend.convert(rule) == ["-Field!=*"]
 
 
 def test_logpoint_angle_brackets(logpoint_backend: Logpoint):
@@ -392,7 +392,7 @@ def test_logpoint_regex_query(logpoint_backend: Logpoint):
 
 def test_logpoint_regex_query_escaped_input(logpoint_backend: Logpoint):
     rule = SigmaCollection.from_yaml(
-        """
+        r"""
             title: Test
             status: test
             logsource:
@@ -407,7 +407,7 @@ def test_logpoint_regex_query_escaped_input(logpoint_backend: Logpoint):
         """
     )
     assert logpoint_backend.convert(rule) == [
-        'fieldB="foo" | process regex("127\.0\.0\.1:[1-9]\d{3}", fieldA, "filter=true") | process regex("foo/bar", fieldC, "filter=true")'
+        r'fieldB="foo" | process regex("127\.0\.0\.1:[1-9]\d{3}", fieldA, "filter=true") | process regex("foo/bar", fieldC, "filter=true")'
     ]
 
 
