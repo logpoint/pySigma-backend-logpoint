@@ -2,7 +2,7 @@ import re
 from typing import Dict, Union, List
 
 from sigma.processing.conditions import LogsourceCondition
-from sigma. processing.pipeline import ProcessingItem, ProcessingPipeline
+from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.processing.transformations import (
     FieldMappingTransformation,
     FieldFunctionTransformation,
@@ -18,7 +18,7 @@ def to_snake_case(field: str) -> str:
     """Convert field name to snake_case."""
     if not field:
         return field
-    
+
     words = re.findall(r"([a-z0-9]+|[A-Z][a-z0-9]+|[A-Z0-9]+)", field)
     if len(words) > 1:
         return "_".join(words).lower()
@@ -43,8 +43,7 @@ def logpoint_linux_pipeline() -> ProcessingPipeline:
             ProcessingItem(
                 identifier="logpoint_linux_generic_mapping",
                 transformation=FieldFunctionTransformation(
-                    transform_func=to_snake_case,
-                    mapping=logpoint_linux_common_taxonomy
+                    transform_func=to_snake_case, mapping=logpoint_linux_common_taxonomy
                 ),
                 rule_conditions=[
                     LogsourceCondition(product="linux"),
