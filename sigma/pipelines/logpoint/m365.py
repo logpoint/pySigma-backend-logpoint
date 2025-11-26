@@ -16,7 +16,7 @@ def m365_field_mapping(field: str):
     # 1. Handle specific prefix logic
     if field.lower().startswith("modifiedproperties"):
         return "modified_property." + field
-    
+
     # 2. Fallback: Dynamic snake_case conversion
     # (Consistent with logic used in other pipelines)
     words = re.findall(r"([a-z0-9]+|[A-Z][a-z0-9]+|[A-Z0-9]+)", field)
