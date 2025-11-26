@@ -49,7 +49,7 @@ def to_snake_case(field: str) -> str:
     """Convert field name to snake_case."""
     if not field:
         return field
-    
+
     words = re.findall(r"([a-z0-9]+|[A-Z][a-z0-9]+|[A-Z0-9]+)", field)
     if len(words) > 1:
         return "_".join(words).lower()
@@ -59,7 +59,7 @@ def to_snake_case(field: str) -> str:
 def generate_windows_sysmon_enriched_query(
     identifier_template: str = "windows_sysmon_{category}",
 ) -> List[ProcessingItem]:
-    """Generate processing items for all Windows sysmon mappings for addition of labels. 
+    """Generate processing items for all Windows sysmon mappings for addition of labels.
     :param identifier_template: Template for processing item identifier.  Usually, the defaults are
         fine.  Should contain service placeholder if changed.
     :type identifier_template: str
@@ -118,7 +118,7 @@ def logpoint_windows_pipeline() -> ProcessingPipeline:
                     LogsourceCondition(**{"product": "windows", logsrc_field: logsrc})
                 ],
             )
-            for field, mappings in logpoint_windows_sysmon_variable_mappings. items()
+            for field, mappings in logpoint_windows_sysmon_variable_mappings.items()
             for (logsrc_field, logsrc, mapped) in mappings
         ]
         + [
@@ -202,7 +202,7 @@ def logpoint_windows_pipeline() -> ProcessingPipeline:
                 identifier="logpoint_windows_generic_field_mapping",
                 transformation=FieldFunctionTransformation(
                     transform_func=to_snake_case,
-                    mapping=logpoint_windows_common_taxonomy
+                    mapping=logpoint_windows_common_taxonomy,
                 ),
                 field_name_condition_negation=True,
                 field_name_condition_linking=any,
