@@ -205,9 +205,7 @@ def test_logpoint_not_filter_null_and(logpoint_backend: Logpoint):
         """
     )
 
-    assert logpoint_backend.convert(rule) == [
-        'FieldA="*valueA" -FieldB!=* -FieldB=""'
-    ]
+    assert logpoint_backend.convert(rule) == ['FieldA="*valueA" -FieldB!=* -FieldB=""']
 
 
 def test_logpoint_filter_null_and(logpoint_backend: Logpoint):
