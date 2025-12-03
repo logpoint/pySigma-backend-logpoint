@@ -161,7 +161,7 @@ def test_logpoint_windows_variable_mapping_registry_event():
             )
         )
         == [
-            'event_id IN [12, 13, 14] norm_id="WindowsSysmon" target_object="*System\CurrentControlSet\Services\VSS*" "process"="*esentutl.exe" - target_object="*System\CurrentControlSet\Services\VSS\Start*"'
+            'event_id IN [12, 13, 14] norm_id="WindowsSysmon" target_object="*System\CurrentControlSet\Services\VSS*" "process"="*esentutl.exe" -target_object="*System\CurrentControlSet\Services\VSS\Start*"'
         ]
     )
 
