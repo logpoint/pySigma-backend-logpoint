@@ -1,3 +1,4 @@
+import re
 from sigma.processing.conditions import (
     LogsourceCondition,
 )
@@ -12,9 +13,16 @@ from sigma.pipelines.logpoint.logpoint_mapping import logpoint_m365_mapping
 
 
 def m365_field_mapping(field: str):
+    # 1. Handle specific prefix logic
     if field.lower().startswith("modifiedproperties"):
         return "modified_property." + field
-    return field
+
+    # 2. Fallback: Dynamic snake_case conversion
+    # (Consistent with logic used in other pipelines)
+    words = re.findall(r"([a-z0-9]+|[A-Z][a-z0-9]+|[A-Z0-9]+)", field)
+    if len(words) > 1:
+        return "_".join(words).lower()
+    return words[0].lower() if words else field.lower()
 
 
 def logpoint_m365_pipeline() -> ProcessingPipeline:
@@ -43,9 +51,12 @@ def logpoint_m365_pipeline() -> ProcessingPipeline:
                 rule_conditions=[LogsourceCondition(product="m365")],
             ),
             ProcessingItem(
-                identifier="logpoint_azure_activity_enrich",
+                # Renamed identifier to be specific to this pipeline
+                identifier="logpoint_m365_custom_mapping",
                 transformation=(
-                    FieldFunctionTransformation(transform_func=m365_field_mapping)
+                    FieldFunctionTransformation(
+                        mapping={}, transform_func=m365_field_mapping
+                    )
                 ),
                 rule_conditions=[LogsourceCondition(product="m365")],
             ),
