@@ -115,11 +115,11 @@ class Logpoint(TextQueryBackend):
     # Value not bound to a field
     # Expression for string value not bound to a field as format string with placeholder {value}
     unbound_value_str_expression: ClassVar[str] = (
-        "{value}"  # str values are already wrapped with quote
+        "{value}"  # str values are already wrapped with quotes
     )
     # Expression for number value not bound to a field as format string with placeholder {value}
     unbound_value_num_expression: ClassVar[str] = (
-        '"{value}"'  # wrap num values in quote
+        '"{value}"'  # wrap num values in quotes
     )
 
     # String used as separator between main query and deferred parts
