@@ -449,3 +449,23 @@ def test_logpoint_double_quote_value(logpoint_backend: Logpoint):
     )
 
     assert logpoint_backend.convert(rule) == ['fieldA="valueA" fieldB=\'val"ueB\'']
+
+
+def test_logpoint_value_only_expr(logpoint_backend: Logpoint):
+    rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    - valueA
+                    - 20
+                    - valueB
+                condition: sel
+        """
+    )
+
+    assert logpoint_backend.convert(rule) == ['"valueA" OR "20" OR "valueB"']
