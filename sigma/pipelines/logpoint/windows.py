@@ -1,9 +1,6 @@
-import dataclasses
 import re
-from dataclasses import dataclass
 from typing import Dict, Union, List, ClassVar, Pattern
 
-from sigma.conditions import ConditionOR
 from sigma.pipelines.common import (
     logsource_windows_process_creation,
     logsource_windows_registry_add,
@@ -32,12 +29,11 @@ from sigma.processing.conditions import (
 )
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.processing.transformations import (
-    FieldMappingTransformationBase,
     FieldMappingTransformation,
     AddConditionTransformation,
     HashesFieldsDetectionItemTransformation,
+    FieldFunctionTransformation,
 )
-from sigma.rule import SigmaDetectionItem, SigmaDetection
 
 from sigma.pipelines.logpoint.logpoint_mapping import (
     logpoint_windows_sysmon_variable_mappings,
@@ -49,77 +45,26 @@ from sigma.pipelines.logpoint.logpoint_mapping import (
 )
 
 
-@dataclass
-class SnakeCaseMappingTransformation(FieldMappingTransformationBase):
-    """Map a field name to one or multiple different."""
+def to_snake_case(field: str) -> str:
+    """Convert field name to snake_case."""
+    if not field:
+        return field
 
-    mapping: Dict[str, Union[str, List[str]]]
-    _re_to_snake_case: ClassVar[Pattern] = re.compile(
-        "([a-z0-9]+|[A-Z][a-z0-9]+|[A-Z0-9]+)"
-    )
-
-    def to_snake_case(self, key):
-        """_to_snake_case converts the fields to snake_case
-
-        Args:
-            key (str): field name in any other case
-
-        Returns:
-            snake_case (str): filed name converted to the snake_case
-        """
-        words = self._re_to_snake_case.findall(key)
-        if len(words) > 1:
-            snake_case = "_".join(words).lower()
-        else:
-            snake_case = words[0].lower()
-        return snake_case
-
-    def get_mapping(self, field: str) -> Union[None, str, List[str]]:
-        if field in self.mapping:
-            mapping = self.mapping[field]
-            return mapping
-
-    def apply_detection_item(self, detection_item: SigmaDetectionItem):
-        super().apply_detection_item(detection_item)
-        field = detection_item.field
-        mapping = self.get_mapping(field) or self.to_snake_case(field)
-        if mapping is not None and self.processing_item.match_field_name(
-            self._pipeline, field
-        ):
-            self._pipeline.field_mappings.add_mapping(field, mapping)
-            if isinstance(
-                mapping, str
-            ):  # 1:1 mapping, map field name of detection item directly
-                detection_item.field = mapping
-                self.processing_item_applied(detection_item)
-            else:
-                return SigmaDetection(
-                    [
-                        dataclasses.replace(
-                            detection_item, field=field, auto_modifiers=False
-                        )
-                        for field in mapping
-                    ],
-                    item_linking=ConditionOR,
-                )
-
-    def apply_field_name(self, field: str) -> Union[str, List[str]]:
-        mapping = self.get_mapping(field) or self.to_snake_case(field)
-        if isinstance(mapping, str):
-            return [mapping]
-        else:
-            return mapping
+    words = re.findall(r"([a-z0-9]+|[A-Z][a-z0-9]+|[A-Z0-9]+)", field)
+    if len(words) > 1:
+        return "_".join(words).lower()
+    return words[0].lower() if words else field.lower()
 
 
 def generate_windows_sysmon_enriched_query(
     identifier_template: str = "windows_sysmon_{category}",
 ) -> List[ProcessingItem]:
     """Generate processing items for all Windows sysmon mappings for addition of labels.
-    :param identifier_template: Template for processing item identifier. Usually, the defaults are
-        fine. Should contain service placeholder if changed.
+    :param identifier_template: Template for processing item identifier.  Usually, the defaults are
+        fine.  Should contain service placeholder if changed.
     :type identifier_template: str
     :return: List of ProcessingItem that can be used in the items attribute of a ProcessingPipeline
-        object. Usually, an additional field name mapping between the Sigma taxonomy and the target
+        object.  Usually, an additional field name mapping between the Sigma taxonomy and the target
         system field names is required.
     :rtype: List[ProcessingItem]
     """
@@ -255,8 +200,9 @@ def logpoint_windows_pipeline() -> ProcessingPipeline:
             ),
             ProcessingItem(  # Generic Field mappings
                 identifier="logpoint_windows_generic_field_mapping",
-                transformation=SnakeCaseMappingTransformation(
-                    logpoint_windows_common_taxonomy
+                transformation=FieldFunctionTransformation(
+                    transform_func=to_snake_case,
+                    mapping=logpoint_windows_common_taxonomy,
                 ),
                 field_name_condition_negation=True,
                 field_name_condition_linking=any,
