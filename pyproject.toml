@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pysigma-backend-logpoint"
-version = "0.3.0"
+version = "0.4.0"
 description = "pySigma Logpoint backend"
 readme="README.md"
 authors = ["Surya Majhi <suryamajhi20@gmail.com>", "Swachchhanda Shrawan Poudel <swachchhandashrawan@gmail.com>"]
