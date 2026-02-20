@@ -11,8 +11,8 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.9"
-pysigma = "^0.11.23"
+python = "^3.10"
+pysigma = "^1.0.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.4.2"
