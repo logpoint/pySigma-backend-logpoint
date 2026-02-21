@@ -17,7 +17,7 @@ from sigma.conversion.deferred import (
 )
 from sigma.conversion.state import ConversionState
 from sigma.correlations import SigmaCorrelationRule
-from sigma.rule import SigmaRule, SigmaDetectionItem
+from sigma.rule import SigmaRule, SigmaDetectionItem, SigmaDetection
 from sigma.types import (
     SigmaCompareExpression,
     SpecialChars,
@@ -158,6 +158,7 @@ class Logpoint(TextQueryBackend):
         state: "sigma.conversion.state.ConversionState",
     ) -> ConditionItem:
         """Defer regular expression matching to pipelined regex command after main search expression."""
+        # TODO: Think about solving when all regex expr are provided either in OR or AND.
         return LogpointDeferredRegularExpression(
             state,
             self.escape_and_quote_field(cond.field),
@@ -299,6 +300,23 @@ class Logpoint(TextQueryBackend):
         except TypeError:  # pragma: no cover
             raise NotImplementedError("Operator 'not' not supported by the backend")
 
+    def _recursively_substitute_sigma_items(self, detection_item: Union[SigmaDetection, SigmaDetectionItem], orig_field: str, new_field: str):
+        if (
+                isinstance(detection_item, SigmaDetectionItem)
+                and orig_field == detection_item.field
+        ):
+            detection_item.field = new_field
+            # Overriding the regex modifier
+            detection_item.modifiers = []
+            # On successful regex match, a new field is add with any value. So re1=* would suffice and filter the results.
+            detection_item.value = [SigmaString("*")]
+
+        elif isinstance(detection_item, SigmaDetection):
+            for d in detection_item.detection_items:
+                self._recursively_substitute_sigma_items(d, orig_field, new_field)
+        else:
+            assert "Should not be here"
+
     def finish_query(
         self,
         rule: Union[SigmaRule, SigmaCorrelationRule],
@@ -346,22 +364,14 @@ class Logpoint(TextQueryBackend):
             )
 
             # Modify the rule to replace the original field with new field processed by regex process command.
-            for i, field in enumerate(deferred_fields):
-                new_field_name = (
+            for i, orig_field in enumerate(deferred_fields):
+                new_field = (
                     f"re{i + 1}"  # Only regular expressions are deferred at this point.
                 )
 
                 for cond, sigma_detection in rule.detection.detections.items():
                     for detection_item in sigma_detection.detection_items:
-                        if (
-                            isinstance(detection_item, SigmaDetectionItem)
-                            and field == detection_item.field
-                        ):
-                            detection_item.field = new_field_name
-                            # Overriding the regex modifier
-                            detection_item.modifiers = []
-                            # On successful regex match, a new field is add with any value. So re1=* would suffice and filter the results.
-                            detection_item.value = [SigmaString("*")]
+                        self._recursively_substitute_sigma_items(detection_item, orig_field, new_field)
 
             # Re-convert the rule again and append at the end with search expression
             query += " \n| search " + self.convert_rule(rule)[0]
