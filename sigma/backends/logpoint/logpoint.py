@@ -300,10 +300,15 @@ class Logpoint(TextQueryBackend):
         except TypeError:  # pragma: no cover
             raise NotImplementedError("Operator 'not' not supported by the backend")
 
-    def _recursively_substitute_sigma_items(self, detection_item: Union[SigmaDetection, SigmaDetectionItem], orig_field: str, new_field: str):
+    def _recursively_substitute_sigma_items(
+        self,
+        detection_item: Union[SigmaDetection, SigmaDetectionItem],
+        orig_field: str,
+        new_field: str,
+    ):
         if (
-                isinstance(detection_item, SigmaDetectionItem)
-                and orig_field == detection_item.field
+            isinstance(detection_item, SigmaDetectionItem)
+            and orig_field == detection_item.field
         ):
             detection_item.field = new_field
             # Overriding the regex modifier
@@ -312,10 +317,10 @@ class Logpoint(TextQueryBackend):
             detection_item.value = [SigmaString("*")]
 
         elif isinstance(detection_item, SigmaDetection):
-            for d in detection_item.detection_items:
-                self._recursively_substitute_sigma_items(d, orig_field, new_field)
+            for dt_item in detection_item.detection_items:
+                self._recursively_substitute_sigma_items(dt_item, orig_field, new_field)
         else:
-            assert "Should not be here"
+            assert "Should not reach here"
 
     def finish_query(
         self,
@@ -371,7 +376,9 @@ class Logpoint(TextQueryBackend):
 
                 for cond, sigma_detection in rule.detection.detections.items():
                     for detection_item in sigma_detection.detection_items:
-                        self._recursively_substitute_sigma_items(detection_item, orig_field, new_field)
+                        self._recursively_substitute_sigma_items(
+                            detection_item, orig_field, new_field
+                        )
 
             # Re-convert the rule again and append at the end with search expression
             query += " \n| search " + self.convert_rule(rule)[0]
