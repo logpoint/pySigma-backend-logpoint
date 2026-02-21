@@ -1,4 +1,3 @@
-import re
 from sigma.processing.conditions import LogsourceCondition
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.processing.transformations import (
@@ -14,18 +13,9 @@ from sigma.pipelines.logpoint.logpoint_mapping import (
 
 
 def azure_field_mapping(field: str) -> str:
-    # 1. Handle specific prefix logic
     if field and field.lower().startswith("targetresources.modifiedproperties"):
         return "target_modified_property." + field
-
-    # 2. Fallback: Dynamic snake_case conversion
-    if not field:
-        return field
-
-    words = re.findall(r"([a-z0-9]+|[A-Z][a-z0-9]+|[A-Z0-9]+)", field)
-    if len(words) > 1:
-        return "_".join(words).lower()
-    return words[0].lower() if words else field.lower()
+    return field
 
 
 def logpoint_azure_pipeline() -> ProcessingPipeline:
