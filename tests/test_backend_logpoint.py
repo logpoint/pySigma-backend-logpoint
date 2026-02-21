@@ -384,13 +384,36 @@ def test_logpoint_regex_query(logpoint_backend: Logpoint):
         """
     )
     assert logpoint_backend.convert(rule) == [
-        'fieldB="foo" | process regex("foo.*bar", fieldA, "filter=true")'
+        '''(fieldB="foo") OR fieldA=* 
+| process regex("(?P<re1>foo.*bar)", fieldA) 
+| search re1="*" fieldB="foo"'''
+    ]
+
+
+def test_logpoint_regex_query_single(logpoint_backend: Logpoint):
+    rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|re: foo.*bar
+                condition: sel
+        """
+    )
+    assert logpoint_backend.convert(rule) == [
+        '''fieldA=* 
+| process regex("(?P<re1>foo.*bar)", fieldA) 
+| search re1="*"'''
     ]
 
 
 def test_logpoint_regex_query_escaped_input(logpoint_backend: Logpoint):
     rule = SigmaCollection.from_yaml(
-        """
+        r"""
             title: Test
             status: test
             logsource:
@@ -405,7 +428,35 @@ def test_logpoint_regex_query_escaped_input(logpoint_backend: Logpoint):
         """
     )
     assert logpoint_backend.convert(rule) == [
-        'fieldB="foo" | process regex("127\.0\.0\.1:[1-9]\d{3}", fieldA, "filter=true") | process regex("foo/bar", fieldC, "filter=true")'
+        r'''(fieldB="foo") OR fieldA=* OR fieldC=* 
+| process regex("(?P<re1>127\.0\.0\.1:[1-9]\d{3})", fieldA) 
+| process regex("(?P<re2>foo/bar)", fieldC) 
+| search re1="*" fieldB="foo" re2="*"'''
+    ]
+
+
+def test_logpoint_regex_query_not(logpoint_backend: Logpoint):
+    rule = SigmaCollection.from_yaml(
+        r"""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|re: 127\.0\.0\.1:[1-9]\d{3}
+                    fieldB: foo
+                filter:
+                    fieldC|re: foo.*bar
+                condition: sel and not filter
+        """
+    )
+    assert logpoint_backend.convert(rule) == [
+        r'''(fieldB="foo") OR fieldA=* OR fieldC=* 
+| process regex("(?P<re1>127\.0\.0\.1:[1-9]\d{3})", fieldA) 
+| process regex("(?P<re2>foo.*bar)", fieldC) 
+| search re1="*" fieldB="foo" -re2="*"'''
     ]
 
 
