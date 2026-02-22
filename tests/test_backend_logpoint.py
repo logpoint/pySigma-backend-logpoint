@@ -410,6 +410,7 @@ def test_logpoint_regex_query_single(logpoint_backend: Logpoint):
 | search re1="*"'''
     ]
 
+
 def test_logpoint_regex_query_or(logpoint_backend: Logpoint):
     rule = SigmaCollection.from_yaml(
         """
@@ -432,6 +433,7 @@ def test_logpoint_regex_query_or(logpoint_backend: Logpoint):
 | search re1="*" OR re2="*"'''
     ]
 
+
 def test_logpoint_regex_query_and(logpoint_backend: Logpoint):
     rule = SigmaCollection.from_yaml(
         """
@@ -453,6 +455,7 @@ def test_logpoint_regex_query_and(logpoint_backend: Logpoint):
 | process regex("(?P<re2>abc.*xyz)", fieldB) 
 | search re1="*" re2="*"'''
     ]
+
 
 def test_logpoint_regex_query_escaped_input(logpoint_backend: Logpoint):
     rule = SigmaCollection.from_yaml(
