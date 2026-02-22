@@ -1,5 +1,6 @@
 import re
-from typing import ClassVar, Dict, List, Optional, Pattern, Tuple, Union, Any
+from collections import ChainMap
+from typing import ClassVar, Dict, List, Optional, Pattern, Tuple, Union, Any, Callable
 
 from sigma.conditions import (
     ConditionItem,
@@ -15,6 +16,9 @@ from sigma.conversion.deferred import (
     DeferredTextQueryExpression,
 )
 from sigma.conversion.state import ConversionState
+from sigma.correlations import SigmaCorrelationRule
+from sigma.exceptions import SigmaError
+from sigma.rule import SigmaRule, SigmaDetectionItem, SigmaDetection
 from sigma.types import (
     SigmaCompareExpression,
     SpecialChars,
@@ -22,15 +26,15 @@ from sigma.types import (
     Placeholder,
 )
 
-import sigma
-
 
 class LogpointDeferredRegularExpression(DeferredTextQueryExpression):
-    template = 'process regex("{value}", {field}, "filter=true")'
+    # Group capturing in regex process command adds the new field in event if successful.
+    template = 'process regex("(?P<re{id}>{value})", {field})'
     default_field = "msg"
 
-    def finalize_expression(self) -> str:
-        return self.template.format(field=self.field, value=self.value)
+    def finalize_expression(self, id) -> str:
+        # id for incremental assignment of the field on prefix re. The new fields will be re1, re2, re3, ...
+        return self.template.format(id=id, field=self.field, value=self.value)
 
 
 class Logpoint(TextQueryBackend):
@@ -109,6 +113,9 @@ class Logpoint(TextQueryBackend):
     # Operator used to convert OR into in-expressions. Must be set if convert_or_as_in is set
     or_in_operator: ClassVar[Optional[str]] = "IN"
 
+    empty_or_expression: ClassVar[Optional[str]] = ""
+    empty_and_expression: ClassVar[Optional[str]] = ""
+
     # List element separator
     list_separator: ClassVar[str] = ", "
 
@@ -123,9 +130,9 @@ class Logpoint(TextQueryBackend):
     )
 
     # String used as separator between main query and deferred parts
-    deferred_start: ClassVar[str] = " | "
+    deferred_start: ClassVar[str] = " \n| "
     # String used to join multiple deferred query parts
-    deferred_separator: ClassVar[str] = " | "
+    deferred_separator: ClassVar[str] = " \n| "
     # String used as query if final query only contains deferred expression
     deferred_only_query: ClassVar[str] = ""
 
@@ -295,3 +302,91 @@ class Logpoint(TextQueryBackend):
             return self.not_token + expr  # convert negated expression to string
         except TypeError:  # pragma: no cover
             raise NotImplementedError("Operator 'not' not supported by the backend")
+
+    def _recursively_substitute_sigma_items(
+        self,
+        detection_item: Union[SigmaDetection, SigmaDetectionItem],
+        orig_field: str,
+        new_field: str,
+    ):
+        if (
+            isinstance(detection_item, SigmaDetectionItem)
+            and orig_field == detection_item.field
+        ):
+            detection_item.field = new_field
+            # Overriding the regex modifier
+            detection_item.modifiers = []
+            # On successful regex match, a new field is add with any value. So re1=* would suffice and filter the results.
+            detection_item.value = [SigmaString("*")]
+
+        elif isinstance(detection_item, SigmaDetection):
+            for dt_item in detection_item.detection_items:
+                self._recursively_substitute_sigma_items(dt_item, orig_field, new_field)
+        else:
+            assert "Should not reach here"
+
+    def finish_query(
+        self,
+        rule: Union[SigmaRule, SigmaCorrelationRule],
+        query: Any,
+        state: ConversionState,
+    ) -> Any:
+        """
+        Finish query by appending deferred query parts to the main conversion result as specified
+        with deferred_start and deferred_separator.
+        """
+        conversion_state = ChainMap(state.processing_state, self.state_defaults)  # type: ignore
+
+        if state.has_deferred():
+            # TODO: For now only worry about deferred regular expression. Need to generalize later.
+            if self.deferred_start is None or self.deferred_separator is None:
+                raise NotImplementedError(
+                    "Deferred query parts are not supported by the backend."
+                )
+            deferred_fields: List[str] = [
+                deferred_expression.field for deferred_expression in state.deferred
+            ]
+            deferred_clause = " OR ".join([f"{field}=*" for field in deferred_fields])
+            query = (
+                deferred_clause
+                if query == "" or isinstance(query, DeferredQueryExpression)
+                else f"({query}) OR {deferred_clause}"
+            )
+
+            query = (
+                self.query_expression.format(
+                    query=query,
+                    rule=rule,
+                    state=conversion_state,
+                )
+                + self.deferred_start
+                + self.deferred_separator.join(
+                    (
+                        deferred_expression.finalize_expression(i + 1)
+                        for i, deferred_expression in enumerate(state.deferred)
+                    )
+                )
+            )
+
+            # Modify the rule to replace the original field with new field processed by regex process command.
+            for i, orig_field in enumerate(deferred_fields):
+                new_field = (
+                    f"re{i + 1}"  # Only regular expressions are deferred at this point.
+                )
+
+                for cond, sigma_detection in rule.detection.detections.items():
+                    for detection_item in sigma_detection.detection_items:
+                        self._recursively_substitute_sigma_items(
+                            detection_item, orig_field, new_field
+                        )
+
+            # Re-convert the rule again and append at the end with search expression
+            query += " \n| search " + self.convert_rule(rule)[0]
+        else:
+            query = self.query_expression.format(
+                query=query,
+                rule=rule,
+                state=conversion_state,
+            )
+
+        return query
