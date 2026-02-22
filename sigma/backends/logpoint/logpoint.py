@@ -1,6 +1,6 @@
 import re
 from collections import ChainMap
-from typing import ClassVar, Dict, List, Optional, Pattern, Tuple, Union, Any
+from typing import ClassVar, Dict, List, Optional, Pattern, Tuple, Union, Any, Callable
 
 from sigma.conditions import (
     ConditionItem,
@@ -17,6 +17,7 @@ from sigma.conversion.deferred import (
 )
 from sigma.conversion.state import ConversionState
 from sigma.correlations import SigmaCorrelationRule
+from sigma.exceptions import SigmaError
 from sigma.rule import SigmaRule, SigmaDetectionItem, SigmaDetection
 from sigma.types import (
     SigmaCompareExpression,
@@ -152,13 +153,102 @@ class Logpoint(TextQueryBackend):
             "or",
         ]
 
+    def convert_rule(
+        self,
+        rule: SigmaRule,
+        output_format: Optional[str] = None,
+        callback: Optional[
+            Callable[[Union[SigmaRule, SigmaCorrelationRule], Optional[str], int, Any, Any], Any]
+        ] = None,
+    ) -> list[Any]:
+        """
+        Convert a single Sigma rule into the target data structure (usually query, see above).
+
+        Args:
+            rule: The Sigma rule to convert
+            output_format: The output format to use for conversion
+            callback: Optional callback function called for each condition conversion.
+                     Receives (rule, output_format, index, cond, result) parameters and
+                     returns a potentially modified result. The returned value replaces
+                     the original conversion result. Return None to skip the result.
+                     Called for every iteration, even when result is None.
+
+        Returns:
+            List of converted queries
+        """
+        try:
+            # Initialize processing pipeline if not already done
+            if (
+                not hasattr(self, "last_processing_pipeline")
+                or self.last_processing_pipeline is None
+            ):
+                self.init_processing_pipeline(output_format)
+
+            error_state = "applying processing pipeline on"
+            self.last_processing_pipeline.apply(rule)  # 1. Apply transformations
+
+            # 2. Convert conditions
+            error_state = "converting"
+            states = [
+                ConversionState(processing_state=dict(self.last_processing_pipeline.state))
+                for _ in rule.detection.parsed_condition
+            ]
+            queries = []
+            for index, cond in enumerate(rule.detection.parsed_condition):
+                state = states[index]
+                result = self.convert_condition(cond.parsed, state)
+                # If multiple deferred only present, then result is None somehow. So, overriding
+                if result is not None or state.has_deferred():
+                    result = self.finish_query(rule, result, state)
+                if callback is not None:
+                    result = callback(rule, output_format, index, cond, result)
+                if result is not None:
+                    queries.append(result)
+
+            error_state = "finalizing query for"
+            # 3. Postprocess generated query if not part of a correlation rule
+            finalized_queries = (
+                [
+                    self.finalize_query(
+                        rule,
+                        query,
+                        index,
+                        states[index],
+                        output_format or self.default_format,
+                    )
+                    for index, query in enumerate(queries)
+                ]
+                if self.finalize_correlation_subqueries or not rule._backreferences
+                else queries
+            )
+            rule.set_conversion_result(finalized_queries)
+            rule.set_conversion_states(states)
+            if rule._output:
+                return finalized_queries
+            else:
+                return []
+        except SigmaError as e:
+            if self.collect_errors:
+                self.errors.append((rule, e))
+                return []
+            else:
+                raise e
+        except (
+            Exception
+        ) as e:  # enrich all other exceptions with Sigma-specific context information
+            msg = f" (while {error_state} rule {str(rule.source)})"
+            if len(e.args) > 1:
+                e.args = (e.args[0] + msg,) + e.args[1:]
+            else:
+                e.args = (e.args[0] + msg,)
+            raise
+
     def convert_condition_field_eq_val_re(
         self,
         cond: ConditionFieldEqualsValueExpression,
         state: "sigma.conversion.state.ConversionState",
     ) -> ConditionItem:
         """Defer regular expression matching to pipelined regex command after main search expression."""
-        # TODO: Think about solving when all regex expr are provided either in OR or AND.
         return LogpointDeferredRegularExpression(
             state,
             self.escape_and_quote_field(cond.field),
@@ -344,7 +434,7 @@ class Logpoint(TextQueryBackend):
                 deferred_expression.field for deferred_expression in state.deferred
             ]
             deferred_fields_inclusion = [f"{field}=*" for field in deferred_fields]
-            if isinstance(query, DeferredQueryExpression):
+            if query is None or isinstance(query, DeferredQueryExpression):
                 query = self.deferred_only_query + " OR ".join(
                     deferred_fields_inclusion
                 )
