@@ -384,9 +384,9 @@ def test_logpoint_regex_query(logpoint_backend: Logpoint):
         """
     )
     assert logpoint_backend.convert(rule) == [
-        '''(fieldB="foo") OR fieldA=* 
-| process regex("(?P<re1>foo.*bar)", fieldA) 
-| search re1="*" fieldB="foo"'''
+        '''| process regex("(?P<fieldA_match>foo.*bar)", fieldA)
+| process eval("fieldA_condition=case(isnotnull(fieldA_match) -> 'true', 'false')")
+| search fieldA_condition="true" fieldB="foo"'''
     ]
 
 
@@ -405,9 +405,9 @@ def test_logpoint_regex_query_single(logpoint_backend: Logpoint):
         """
     )
     assert logpoint_backend.convert(rule) == [
-        '''fieldA=* 
-| process regex("(?P<re1>foo.*bar)", fieldA) 
-| search re1="*"'''
+        '''| process regex("(?P<fieldA_match>foo.*bar)", fieldA)
+| process eval("fieldA_condition=case(isnotnull(fieldA_match) -> 'true', 'false')")
+| search fieldA_condition="true"'''
     ]
 
 
@@ -427,10 +427,36 @@ def test_logpoint_regex_query_or(logpoint_backend: Logpoint):
         """
     )
     assert logpoint_backend.convert(rule) == [
-        '''fieldA=* OR fieldB=* 
-| process regex("(?P<re1>foo.*bar)", fieldA) 
-| process regex("(?P<re2>abc.*xyz)", fieldB) 
-| search re1="*" OR re2="*"'''
+        '''| process regex("(?P<fieldA_match>foo.*bar)", fieldA)
+| process eval("fieldA_condition=case(isnotnull(fieldA_match) -> \'true\', \'false\')") 
+| process regex("(?P<fieldB_match>abc.*xyz)", fieldB)
+| process eval("fieldB_condition=case(isnotnull(fieldB_match) -> \'true\', \'false\')")
+| search fieldA_condition="true" OR fieldB_condition="true"'''
+    ]
+
+
+def test_logpoint_regex_query_or_single_field(logpoint_backend: Logpoint):
+    rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|re: 
+                        - foo.*bar
+                        - abc.*xyz
+                condition: sel
+        """
+    )
+    assert logpoint_backend.convert(rule) == [
+        '''| process regex("(?P<fieldA_match>foo.*bar)", fieldA)
+| process eval("fieldA_condition=case(isnotnull(fieldA_match) -> 'true', 'false')") 
+| process regex("(?P<fieldA_match2>abc.*xyz)", fieldA)
+| process eval("fieldA_condition2=case(isnotnull(fieldA_match2) -> 'true', 'false')")
+| search fieldA_condition="true" OR fieldA_condition2="true"'''
     ]
 
 
@@ -450,10 +476,11 @@ def test_logpoint_regex_query_and(logpoint_backend: Logpoint):
         """
     )
     assert logpoint_backend.convert(rule) == [
-        '''fieldA=* OR fieldB=* 
-| process regex("(?P<re1>foo.*bar)", fieldA) 
-| process regex("(?P<re2>abc.*xyz)", fieldB) 
-| search re1="*" re2="*"'''
+        '''| process regex("(?P<fieldA_match>foo.*bar)", fieldA)
+| process eval("fieldA_condition=case(isnotnull(fieldA_match) -> 'true', 'false')") 
+| process regex("(?P<fieldB_match>abc.*xyz)", fieldB)
+| process eval("fieldB_condition=case(isnotnull(fieldB_match) -> 'true', 'false')")
+| search fieldA_condition="true" fieldB_condition="true"'''
     ]
 
 
@@ -474,10 +501,11 @@ def test_logpoint_regex_query_escaped_input(logpoint_backend: Logpoint):
         """
     )
     assert logpoint_backend.convert(rule) == [
-        r'''(fieldB="foo") OR fieldA=* OR fieldC=* 
-| process regex("(?P<re1>127\.0\.0\.1:[1-9]\d{3})", fieldA) 
-| process regex("(?P<re2>foo/bar)", fieldC) 
-| search re1="*" fieldB="foo" re2="*"'''
+        r'''| process regex("(?P<fieldA_match>127\.0\.0\.1:[1-9]\d{3})", fieldA)
+| process eval("fieldA_condition=case(isnotnull(fieldA_match) -> 'true', 'false')") 
+| process regex("(?P<fieldC_match>foo/bar)", fieldC)
+| process eval("fieldC_condition=case(isnotnull(fieldC_match) -> 'true', 'false')")
+| search fieldA_condition="true" fieldB="foo" fieldC_condition="true"'''
     ]
 
 
@@ -499,10 +527,11 @@ def test_logpoint_regex_query_not(logpoint_backend: Logpoint):
         """
     )
     assert logpoint_backend.convert(rule) == [
-        r'''(fieldB="foo") OR fieldA=* OR fieldC=* 
-| process regex("(?P<re1>127\.0\.0\.1:[1-9]\d{3})", fieldA) 
-| process regex("(?P<re2>foo.*bar)", fieldC) 
-| search re1="*" fieldB="foo" -re2="*"'''
+        r'''| process regex("(?P<fieldA_match>127\.0\.0\.1:[1-9]\d{3})", fieldA)
+| process eval("fieldA_condition=case(isnotnull(fieldA_match) -> 'true', 'false')") 
+| process regex("(?P<fieldC_match>foo.*bar)", fieldC)
+| process eval("fieldC_condition=case(isnotnull(fieldC_match) -> 'true', 'false')")
+| search fieldA_condition="true" fieldB="foo" -fieldC_condition="true"'''
     ]
 
 

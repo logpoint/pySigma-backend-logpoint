@@ -1,6 +1,5 @@
 import re
-from collections import ChainMap
-from typing import ClassVar, Dict, List, Optional, Pattern, Tuple, Union, Any, Callable
+from typing import ClassVar, Dict, List, Optional, Pattern, Tuple, Union, Any
 
 from sigma.conditions import (
     ConditionItem,
@@ -17,8 +16,7 @@ from sigma.conversion.deferred import (
 )
 from sigma.conversion.state import ConversionState
 from sigma.correlations import SigmaCorrelationRule
-from sigma.exceptions import SigmaError
-from sigma.rule import SigmaRule, SigmaDetectionItem, SigmaDetection
+from sigma.rule import SigmaRule
 from sigma.types import (
     SigmaCompareExpression,
     SpecialChars,
@@ -28,13 +26,48 @@ from sigma.types import (
 
 
 class LogpointDeferredRegularExpression(DeferredTextQueryExpression):
-    # Group capturing in regex process command adds the new field in event if successful.
-    template = 'process regex("(?P<re{id}>{value})", {field})'
+    field_count = {}
     default_field = "msg"
+    operators = {True: "!=", False: "="}
 
-    def finalize_expression(self, id) -> str:
-        # id for incremental assignment of the field on prefix re. The new fields will be re1, re2, re3, ...
-        return self.template.format(id=id, field=self.field, value=self.value)
+    def __init__(self, state, field, arg):
+        self.add_field(field)
+        field_condition = self.get_field_condition(field)
+        field_match = self.get_field_match(field)
+        self.template = "process regex(\"(?P<{field_match}>{{value}})\", {{field}})\n| process eval(\"{field_condition}=case(isnotnull({field_match}) -> 'true', 'false')\")".format(
+            field_match=field_match, field_condition=field_condition
+        )
+        super().__init__(state, field, arg)
+
+    @classmethod
+    def add_field(cls, field):
+        cls.field_count[field] = (
+            cls.field_count.get(field, 0) + 1
+        )  # increment the field count
+
+    @classmethod
+    def get_field_suffix(cls, field):
+        index_suffix = cls.field_count.get(field, "")
+        if index_suffix == 1:
+            index_suffix = ""
+        return index_suffix
+
+    @classmethod
+    def construct_field_variable(cls, field, variable):
+        index_suffix = cls.get_field_suffix(field)
+        return f"{field}_{variable}{index_suffix}"
+
+    @classmethod
+    def get_field_match(cls, field):
+        return cls.construct_field_variable(field, "match")
+
+    @classmethod
+    def get_field_condition(cls, field):
+        return cls.construct_field_variable(field, "condition")
+
+    @classmethod
+    def reset(cls):
+        cls.field_count = {}
 
 
 class Logpoint(TextQueryBackend):
@@ -130,7 +163,7 @@ class Logpoint(TextQueryBackend):
     )
 
     # String used as separator between main query and deferred parts
-    deferred_start: ClassVar[str] = " \n| "
+    deferred_start: ClassVar[str] = "| "
     # String used to join multiple deferred query parts
     deferred_separator: ClassVar[str] = " \n| "
     # String used as query if final query only contains deferred expression
@@ -162,11 +195,17 @@ class Logpoint(TextQueryBackend):
         state: "sigma.conversion.state.ConversionState",
     ) -> ConditionItem:
         """Defer regular expression matching to pipelined regex command after main search expression."""
-        return LogpointDeferredRegularExpression(
+        LogpointDeferredRegularExpression(
             state,
-            self.escape_and_quote_field(cond.field),
+            cond.field,
             super().convert_condition_field_eq_val_re(cond, state),
         ).postprocess(None, cond)
+
+        cond_true = ConditionFieldEqualsValueExpression(
+            LogpointDeferredRegularExpression.get_field_condition(cond.field),
+            SigmaString("true"),
+        )
+        return super().convert_condition_field_eq_val_str(cond_true, state)
 
     def escape_and_quote_field(self, field_name: str) -> str:
         """
@@ -303,28 +342,6 @@ class Logpoint(TextQueryBackend):
         except TypeError:  # pragma: no cover
             raise NotImplementedError("Operator 'not' not supported by the backend")
 
-    def _recursively_substitute_sigma_items(
-        self,
-        detection_item: Union[SigmaDetection, SigmaDetectionItem],
-        orig_field: str,
-        new_field: str,
-    ):
-        if (
-            isinstance(detection_item, SigmaDetectionItem)
-            and orig_field == detection_item.field
-        ):
-            detection_item.field = new_field
-            # Overriding the regex modifier
-            detection_item.modifiers = []
-            # On successful regex match, a new field is add with any value. So re1=* would suffice and filter the results.
-            detection_item.value = [SigmaString("*")]
-
-        elif isinstance(detection_item, SigmaDetection):
-            for dt_item in detection_item.detection_items:
-                self._recursively_substitute_sigma_items(dt_item, orig_field, new_field)
-        else:
-            assert "Should not reach here"
-
     def finish_query(
         self,
         rule: Union[SigmaRule, SigmaCorrelationRule],
@@ -335,58 +352,29 @@ class Logpoint(TextQueryBackend):
         Finish query by appending deferred query parts to the main conversion result as specified
         with deferred_start and deferred_separator.
         """
-        conversion_state = ChainMap(state.processing_state, self.state_defaults)  # type: ignore
+        if isinstance(query, DeferredQueryExpression):
+            query = self.deferred_only_query
 
         if state.has_deferred():
-            # TODO: For now only worry about deferred regular expression. Need to generalize later.
-            if self.deferred_start is None or self.deferred_separator is None:
-                raise NotImplementedError(
-                    "Deferred query parts are not supported by the backend."
-                )
-            deferred_fields: List[str] = [
-                deferred_expression.field for deferred_expression in state.deferred
-            ]
-            deferred_clause = " OR ".join([f"{field}=*" for field in deferred_fields])
-            query = (
-                deferred_clause
-                if query == "" or isinstance(query, DeferredQueryExpression)
-                else f"({query}) OR {deferred_clause}"
-            )
+            deferred_regex_expressions = []
+            remaining_deferred = []
 
-            query = (
-                self.query_expression.format(
-                    query=query,
-                    rule=rule,
-                    state=conversion_state,
-                )
-                + self.deferred_start
-                + self.deferred_separator.join(
-                    (
-                        deferred_expression.finalize_expression(i + 1)
-                        for i, deferred_expression in enumerate(state.deferred)
+            for deferred_expression in state.deferred:
+                if isinstance(deferred_expression, LogpointDeferredRegularExpression):
+                    deferred_regex_expressions.append(
+                        deferred_expression.finalize_expression()
                     )
+                else:
+                    remaining_deferred.append(deferred_expression)
+
+            if deferred_regex_expressions:
+                LogpointDeferredRegularExpression.reset()
+                state.deferred[:] = remaining_deferred
+                query = (
+                    self.deferred_start
+                    + self.deferred_separator.join(deferred_regex_expressions)
+                    + "\n| search "
+                    + query
                 )
-            )
 
-            # Modify the rule to replace the original field with new field processed by regex process command.
-            for i, orig_field in enumerate(deferred_fields):
-                new_field = (
-                    f"re{i + 1}"  # Only regular expressions are deferred at this point.
-                )
-
-                for cond, sigma_detection in rule.detection.detections.items():
-                    for detection_item in sigma_detection.detection_items:
-                        self._recursively_substitute_sigma_items(
-                            detection_item, orig_field, new_field
-                        )
-
-            # Re-convert the rule again and append at the end with search expression
-            query += " \n| search " + self.convert_rule(rule)[0]
-        else:
-            query = self.query_expression.format(
-                query=query,
-                rule=rule,
-                state=conversion_state,
-            )
-
-        return query
+        return super().finish_query(rule, query, state)
