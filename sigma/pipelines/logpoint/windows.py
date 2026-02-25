@@ -96,7 +96,6 @@ def generate_windows_sysmon_enriched_query(
 
 
 def logpoint_windows_pipeline() -> ProcessingPipeline:
-    services = []
     return ProcessingPipeline(
         name="Logpoint Windows",
         allowed_backends={"logpoint"},
