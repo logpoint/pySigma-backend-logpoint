@@ -21,6 +21,7 @@ from sigma.pipelines.common import (
     logsource_windows_process_access,
     logsource_windows_pipe_created,
     logsource_windows_image_load,
+    generate_windows_logsource_items,
 )
 from sigma.processing.conditions import (
     LogsourceCondition,
@@ -95,6 +96,7 @@ def generate_windows_sysmon_enriched_query(
 
 
 def logpoint_windows_pipeline() -> ProcessingPipeline:
+    services = []
     return ProcessingPipeline(
         name="Logpoint Windows",
         allowed_backends={"logpoint"},
@@ -110,6 +112,7 @@ def logpoint_windows_pipeline() -> ProcessingPipeline:
             )
         ]
         + generate_windows_sysmon_enriched_query()
+        + generate_windows_logsource_items("channel", "{source}")
         + [
             ProcessingItem(
                 identifier="logpoint_windows_sysmon_image_mapping",
@@ -160,8 +163,34 @@ def logpoint_windows_pipeline() -> ProcessingPipeline:
             ProcessingItem(
                 identifier="logpoint_windows_security_norm_id_enrich",
                 transformation=(AddConditionTransformation({"norm_id": "WinServer"})),
+                rule_condition_linking=any,
                 rule_conditions=[
-                    LogsourceCondition(product="windows", service="security")
+                    LogsourceCondition(product="windows", service="security"),
+                    LogsourceCondition(product="windows", service="application"),
+                    LogsourceCondition(product="windows", service="system"),
+                    LogsourceCondition(product="windows", service="powershell"),
+                    LogsourceCondition(product="windows", service="powershell-classic"),
+                    LogsourceCondition(product="windows", service="taskscheduler"),
+                    LogsourceCondition(product="windows", service="wmi"),
+                    LogsourceCondition(product="windows", service="driver-framework"),
+                    LogsourceCondition(product="windows", service="ntlm"),
+                    LogsourceCondition(
+                        product="windows", service="msexchange-management"
+                    ),
+                    LogsourceCondition(
+                        product="windows", service="security-mitigations"
+                    ),
+                    LogsourceCondition(product="windows", service="diagnosis-scripted"),
+                    LogsourceCondition(product="windows", service="shell-core"),
+                    LogsourceCondition(product="windows", service="openssh"),
+                    LogsourceCondition(product="windows", service="bitlocker"),
+                    LogsourceCondition(product="windows", service="capi2"),
+                    LogsourceCondition(product="windows", service="windefend"),
+                    LogsourceCondition(
+                        product="windows", service="microsoft-servicebus-client"
+                    ),
+                    LogsourceCondition(product="windows", service="ldap_debug"),
+                    LogsourceCondition(product="windows", service="firewall-as"),
                 ],
             ),
         ]

@@ -25,7 +25,7 @@ def test_logpoint_windows():
             )
         )
         == [
-            'norm_id="WinServer" event_id=123 image="test.exe" test_field="test" target_object="obj"'
+            'norm_id="WinServer" channel="Security" event_id=123 image="test.exe" test_field="test" target_object="obj"'
         ]
     )
 
@@ -251,5 +251,32 @@ def test_logpoint_windows_hashes_duplicates():
             'hash_sha1="8B12C6DA8FAC0D5E8AB999C31E5EA04AF32D53DC" OR '
             'hash_sha256="8EE9D84DE50803545937A63C686822388A3338497CDDB660D5D69CF68B68F287" '
             'OR hash_import="B68908ADAEB5D662F87F2528AF318F12"'
+        ]
+    )
+
+
+def test_logpoint_windows_service():
+    assert (
+        Logpoint(logpoint_windows_pipeline()).convert(
+            SigmaCollection.from_yaml(
+                """
+                title: Windows Defender Threat Detection Disabled
+                logsource:
+                    # Windows Defender
+                    product: windows
+                    service: windefend
+                detection:
+                    selection:
+                        EventID:
+                            - 5001
+                            - 5010
+                            - 5012
+                            - 5101
+                    condition: selection
+                """
+            )
+        )
+        == [
+            'norm_id="WinServer" channel="Microsoft-Windows-Windows Defender/Operational" event_id IN [5001, 5010, 5012, 5101]'
         ]
     )
