@@ -160,7 +160,7 @@ def logpoint_windows_pipeline() -> ProcessingPipeline:
                 ],
             ),
             ProcessingItem(
-                identifier="logpoint_windows_security_norm_id_enrich",
+                identifier="logpoint_windows_norm_id_enrich",
                 transformation=(AddConditionTransformation({"norm_id": "WinServer"})),
                 rule_condition_linking=any,
                 rule_conditions=[
