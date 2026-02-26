@@ -15,6 +15,8 @@ from sigma.conversion.deferred import (
     DeferredTextQueryExpression,
 )
 from sigma.conversion.state import ConversionState
+from sigma.correlations import SigmaCorrelationRule
+from sigma.rule import SigmaRule
 from sigma.types import (
     SigmaCompareExpression,
     SpecialChars,
@@ -22,15 +24,50 @@ from sigma.types import (
     Placeholder,
 )
 
-import sigma
-
 
 class LogpointDeferredRegularExpression(DeferredTextQueryExpression):
-    template = 'process regex("{value}", {field}, "filter=true")'
+    field_count = {}
     default_field = "msg"
+    operators = {True: "!=", False: "="}
 
-    def finalize_expression(self) -> str:
-        return self.template.format(field=self.field, value=self.value)
+    def __init__(self, state, field, arg):
+        self.add_field(field)
+        field_condition = self.get_field_condition(field)
+        field_match = self.get_field_match(field)
+        self.template = "process regex(\"(?P<{field_match}>{{value}})\", {{field}})\n| process eval(\"{field_condition}=case(isnotnull({field_match}) -> 'true', 'false')\")".format(
+            field_match=field_match, field_condition=field_condition
+        )
+        super().__init__(state, field, arg)
+
+    @classmethod
+    def add_field(cls, field):
+        cls.field_count[field] = (
+            cls.field_count.get(field, 0) + 1
+        )  # increment the field count
+
+    @classmethod
+    def get_field_suffix(cls, field):
+        index_suffix = cls.field_count.get(field, "")
+        if index_suffix == 1:
+            index_suffix = ""
+        return index_suffix
+
+    @classmethod
+    def construct_field_variable(cls, field, variable):
+        index_suffix = cls.get_field_suffix(field)
+        return f"{field}_{variable}{index_suffix}"
+
+    @classmethod
+    def get_field_match(cls, field):
+        return cls.construct_field_variable(field, "match")
+
+    @classmethod
+    def get_field_condition(cls, field):
+        return cls.construct_field_variable(field, "condition")
+
+    @classmethod
+    def reset(cls):
+        cls.field_count = {}
 
 
 class Logpoint(TextQueryBackend):
@@ -109,6 +146,9 @@ class Logpoint(TextQueryBackend):
     # Operator used to convert OR into in-expressions. Must be set if convert_or_as_in is set
     or_in_operator: ClassVar[Optional[str]] = "IN"
 
+    empty_or_expression: ClassVar[Optional[str]] = ""
+    empty_and_expression: ClassVar[Optional[str]] = ""
+
     # List element separator
     list_separator: ClassVar[str] = ", "
 
@@ -123,9 +163,9 @@ class Logpoint(TextQueryBackend):
     )
 
     # String used as separator between main query and deferred parts
-    deferred_start: ClassVar[str] = " | "
+    deferred_start: ClassVar[str] = "| "
     # String used to join multiple deferred query parts
-    deferred_separator: ClassVar[str] = " | "
+    deferred_separator: ClassVar[str] = " \n| "
     # String used as query if final query only contains deferred expression
     deferred_only_query: ClassVar[str] = ""
 
@@ -155,11 +195,33 @@ class Logpoint(TextQueryBackend):
         state: "sigma.conversion.state.ConversionState",
     ) -> ConditionItem:
         """Defer regular expression matching to pipelined regex command after main search expression."""
-        return LogpointDeferredRegularExpression(
+        LogpointDeferredRegularExpression(
             state,
-            self.escape_and_quote_field(cond.field),
+            cond.field,
             super().convert_condition_field_eq_val_re(cond, state),
         ).postprocess(None, cond)
+
+        cond_true = ConditionFieldEqualsValueExpression(
+            LogpointDeferredRegularExpression.get_field_condition(cond.field),
+            SigmaString("true"),
+        )
+        return super().convert_condition_field_eq_val_str(cond_true, state)
+
+    def convert_value_str(self, s: SigmaString, state: ConversionState) -> str:
+        """Convert a SigmaString into a plain string which can be used in query.
+        Overwrite cause we don't want to escape double quote character as we can quote the whole value with single quote.
+        """
+        converted = s.convert(
+            self.escape_char,
+            self.wildcard_multi,
+            self.wildcard_single,
+            self.add_escaped,
+            self.filter_chars,
+        )
+        if self.decide_string_quoting(s):
+            return self.quote_string(converted)
+        else:
+            return converted
 
     def escape_and_quote_field(self, field_name: str) -> str:
         """
@@ -197,20 +259,6 @@ class Logpoint(TextQueryBackend):
         if '"' in s:
             return "'" + s + "'"
         return self.str_quote + s + self.str_quote
-
-    def convert_value_str(self, s: SigmaString, state: ConversionState) -> str:
-        """Convert a SigmaString into a plain string which can be used in query."""
-        converted = s.convert(
-            self.escape_char,
-            self.wildcard_multi,
-            self.wildcard_single,
-            self.add_escaped,
-            self.filter_chars,
-        )
-        if self.decide_string_quoting(s):
-            return self.quote_string(converted)
-        else:
-            return converted
 
     def construct_sigma_string_for_json_substring(
         self,
@@ -295,3 +343,40 @@ class Logpoint(TextQueryBackend):
             return self.not_token + expr  # convert negated expression to string
         except TypeError:  # pragma: no cover
             raise NotImplementedError("Operator 'not' not supported by the backend")
+
+    def finish_query(
+        self,
+        rule: Union[SigmaRule, SigmaCorrelationRule],
+        query: Any,
+        state: ConversionState,
+    ) -> Any:
+        """
+        Finish query by appending deferred query parts to the main conversion result as specified
+        with deferred_start and deferred_separator.
+        """
+        if isinstance(query, DeferredQueryExpression):
+            query = self.deferred_only_query
+
+        if state.has_deferred():
+            deferred_regex_expressions = []
+            remaining_deferred = []
+
+            for deferred_expression in state.deferred:
+                if isinstance(deferred_expression, LogpointDeferredRegularExpression):
+                    deferred_regex_expressions.append(
+                        deferred_expression.finalize_expression()
+                    )
+                else:
+                    remaining_deferred.append(deferred_expression)
+
+            if deferred_regex_expressions:
+                LogpointDeferredRegularExpression.reset()
+                state.deferred[:] = remaining_deferred
+                query = (
+                    self.deferred_start
+                    + self.deferred_separator.join(deferred_regex_expressions)
+                    + "\n| search "
+                    + query
+                )
+
+        return super().finish_query(rule, query, state)
