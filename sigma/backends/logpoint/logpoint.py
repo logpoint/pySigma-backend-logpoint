@@ -100,7 +100,6 @@ class Logpoint(TextQueryBackend):
     and_token: ClassVar[str] = " "
     not_token: ClassVar[str] = "-"
     eq_token: ClassVar[str] = "="
-    escape_char: ClassVar[str] = ""
 
     field_quote: ClassVar[str] = '"'
     field_quote_pattern: ClassVar[Pattern] = re.compile(r"^[\w.]+$")
@@ -207,6 +206,22 @@ class Logpoint(TextQueryBackend):
             SigmaString("true"),
         )
         return super().convert_condition_field_eq_val_str(cond_true, state)
+
+    def convert_value_str(self, s: SigmaString, state: ConversionState) -> str:
+        """Convert a SigmaString into a plain string which can be used in query.
+        Overwrite cause we don't want to escape double quote character as we can quote the whole value with single quote.
+        """
+        converted = s.convert(
+            self.escape_char,
+            self.wildcard_multi,
+            self.wildcard_single,
+            self.add_escaped,
+            self.filter_chars,
+        )
+        if self.decide_string_quoting(s):
+            return self.quote_string(converted)
+        else:
+            return converted
 
     def escape_and_quote_field(self, field_name: str) -> str:
         """
