@@ -10,6 +10,9 @@ Further, it contains the processing pipieline `sigma.pipelines.logpoint`, which 
 The `sigma.pipelines.logpoint module` includes the following processing pipelines:
 
 * `logpoint_windows`: This pipeline is designed to convert Sigma rules into queries specifically tailored for the Windows event logging format used by Logpoint.
+* `logpoint_azure`: This pipeline is designed to convert Sigma rules into queries specifically tailored for the Azure event logging format used by Logpoint
+* `logpoint_o365`: This pipeline is designed to convert Sigma rules into queries specifically tailored for the Office 365 event logging format used by Logpoint
+* `logpoint_defer_contains`: This pipeline defer the Sigma `contains` keyword into eval expression. Useful when default query can't fetch the events and results in search timeout due to large number of wildcard searches. This optional pipeline can be used with in addition to other logpoint pipelines.
 
 ## Rule Support
 The Logpoint backend supports the following log sources/rule types:
@@ -21,15 +24,22 @@ The Logpoint backend supports the following log sources/rule types:
 
 ## Usage example
 
+### SigConverter (Sigma Rule Converter)
+1. Head to sigconverter website: [sigconverter.io](https://sigconverter.io/)
+2. Choose `logpoint` backend.
+3. Choose logpoint related required pipeline.
+4. Copy sigma rule in rule.yml
+5. Result appears in query.
+
 ### Sigma CLI
 
 #### Requirements
 
-1. To use Sigma CLI (the Sigma Rule Converter) and its underlying library, ensure you have Python version 3.8 or higher installed.
-2. Install dependent **pysigma** verison 0.11.23. Installing other versions may output errors.
+1. To use Sigma CLI (the Sigma Rule Converter) and its underlying library, ensure you have Python version 3.10 or higher installed.
+2. Install dependent **pysigma**.
 
 ```bash
-pip3 install pysigma==0.11.23
+pip3 install pysigma
 ```
 
 3. Install **sigma-cli**, command line tool for sigma rule conversion
