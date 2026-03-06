@@ -25,11 +25,16 @@ The Logpoint backend supports the following log sources/rule types:
 ## Usage example
 
 ### SigConverter (Sigma Rule Converter)
-1. Head to sigconverter website: [sigconverter.io](https://sigconverter.io/)
-2. Choose `logpoint` backend.
-3. Choose logpoint related required pipeline.
-4. Copy sigma rule in rule.yml
-5. Result appears in query.
+
+1. Open **sigconverter**: [sigconverter.io](https://sigconverter.io/)
+2. In **Backend**, select **`logpoint`**.
+3. In **Pipeline**, choose the Logpoint pipeline that matches your data source:
+   - `logpoint_windows`
+   - `logpoint_azure`
+   - `logpoint_o365`
+4. *(Optional)* Add `logpoint_defer_contains` **in addition to** one of the pipelines above to defer Sigma `contains` into an eval expression. This can help reduce wildcard-heavy searches that may lead to timeouts.
+5. Paste your Sigma rule into the editor (e.g., `rule.yml`).
+6. The converted **Logpoint query** will appear in the output panel—copy it as needed.
 
 ### Sigma CLI
 
