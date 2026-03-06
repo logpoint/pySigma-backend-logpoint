@@ -25,7 +25,8 @@ def test_logpoint_defer_contains():
             )
         )
         == [
-            '''| process eval("fieldA_contains=issubstr('abc', fieldA) || issubstr('xyz', fieldA)")
+            '''
+| process eval("fieldA_contains=issubstr('abc', fieldA) || issubstr('xyz', fieldA)")
 | search fieldA_contains="true"'''
         ]
     )
@@ -52,7 +53,8 @@ def test_logpoint_defer_contains_wildcard():
             )
         )
         == [
-            '''| process eval("fieldA_contains=match(fieldA, '(?i)ab.*c') || match(fieldA, '(?i)ab.c') || issubstr('xyz', fieldA)")
+            '''
+| process eval("fieldA_contains=match(fieldA, '(?i)ab.*c') || match(fieldA, '(?i)ab.c') || issubstr('xyz', fieldA)")
 | search fieldA_contains="true"'''
         ]
     )
@@ -79,7 +81,8 @@ def test_logpoint_defer_contains_wildcard_escape():
             )
         )
         == [
-            '''| process eval("fieldA_contains=issubstr('ab*c', fieldA) || issubstr('ab?c', fieldA) || issubstr('xyz', fieldA)")
+            '''
+| process eval("fieldA_contains=issubstr('ab*c', fieldA) || issubstr('ab?c', fieldA) || issubstr('xyz', fieldA)")
 | search fieldA_contains="true"'''
         ]
     )
@@ -106,7 +109,8 @@ def test_logpoint_defer_contains_wildcard_and_wildcard_escape():
             )
         )
         == [
-            '''| process eval("fieldA_contains=match(fieldA, '(?i)ab\*.*c') || match(fieldA, '(?i)ab\?c.*d') || issubstr('xyz', fieldA)")
+            '''
+| process eval("fieldA_contains=match(fieldA, '(?i)ab\*.*c') || match(fieldA, '(?i)ab\?c.*d') || issubstr('xyz', fieldA)")
 | search fieldA_contains="true"'''
         ]
     )
@@ -201,8 +205,56 @@ level: high
             )
         )
         == [
-            r'''| process eval("user_contains=issubstr('AUTHORI', user) || issubstr('AUTORI', user)") 
+            r'''label="Process" label="Create"
+| process eval("user_contains=issubstr('AUTHORI', user) || issubstr('AUTORI', user)") 
 | process eval("command_contains=issubstr(' -NoP ', command) || issubstr(' -W Hidden ', command) || issubstr(' -decode ', command) || issubstr(' /decode ', command) || issubstr(' /urlcache ', command) || issubstr(' -urlcache ', command) || issubstr(' -e* JAB', command) || match(command, '(?i) -e.* SUVYI') || match(command, '(?i) -e.* SQBFAFgA') || match(command, '(?i) -e.* aWV4I') || match(command, '(?i) -e.* IAB') || match(command, '(?i) -e.* PAA') || match(command, '(?i) -e.* aQBlAHgA') || issubstr('vssadmin delete shadows', command) || issubstr('reg SAVE HKLM', command) || issubstr(' -ma ', command) || issubstr('Microsoft\Windows\CurrentVersion\Run', command) || issubstr('.downloadstring(', command) || issubstr('.downloadfile(', command) || issubstr(' /ticket:', command) || issubstr('dpapi::', command) || issubstr('event::clear', command) || issubstr('event::drop', command) || issubstr('id::modify', command) || issubstr('kerberos::', command) || issubstr('lsadump::', command) || issubstr('misc::', command) || issubstr('privilege::', command) || issubstr('rpc::', command) || issubstr('sekurlsa::', command) || issubstr('sid::', command) || issubstr('token::', command) || issubstr('vault::cred', command) || issubstr('vault::list', command) || issubstr(' p::d ', command) || issubstr(';iex(', command) || issubstr('MiniDump', command) || issubstr('net user ', command)")
-| search label="Create" label="Process" integrity_level="System" user_contains="true" "process" IN ["*\calc.exe", "*\wscript.exe", "*\cscript.exe", "*\hh.exe", "*\mshta.exe", "*\forfiles.exe", "*\ping.exe"] OR command_contains="true"'''
+| search integrity_level="System" user_contains="true" "process" IN ["*\calc.exe", "*\wscript.exe", "*\cscript.exe", "*\hh.exe", "*\mshta.exe", "*\forfiles.exe", "*\ping.exe"] OR command_contains="true"'''
+        ]
+    )
+
+
+def test_logpoint_defers_contain_real_example_2():
+    resolver = ProcessingPipelineResolver(
+        {
+            "defer_contains": logpoint_defer_contains(),
+            "window": logpoint_windows_pipeline(),
+        }
+    )
+    assert (
+        Logpoint(resolver.resolve(["defer_contains", "window"])).convert(
+            SigmaCollection.from_yaml(
+                r"""
+                    title: Esentutl Volume Shadow Copy Service Keys
+                    id: 5aad0995-46ab-41bd-a9ff-724f41114971
+                    status: test
+                    description: Detects the volume shadow copy service initialization and processing via esentutl. Registry keys such as HKLM\\System\\CurrentControlSet\\Services\\VSS\\Diag\\VolSnap\\Volume are captured.
+                    references:
+                        - https://github.com/redcanaryco/atomic-red-team/blob/f339e7da7d05f6057fdfcdd3742bfcf365fee2a9/atomics/T1003.002/T1003.002.md#atomic-test-3---esentutlexe-sam-copy
+                    author: Roberto Rodriguez (Cyb3rWard0g), OTR (Open Threat Research)
+                    tags:
+                        - attack.credential_access
+                        - attack.t1003.002
+                    logsource:
+                        category: registry_event
+                        product: windows
+                    detection:
+                        selection:
+                            TargetObject|contains: 
+                                - 'System\CurrentControlSet\Services\VSS'
+                                - 'e* JAB'
+                            Image|endswith: 'esentutl.exe' # limit esentutl as in references, too many FP to filter
+                        filter:
+                            TargetObject|contains: 'System\CurrentControlSet\Services\VSS\Start'
+                        condition: selection and not filter
+                    falsepositives:
+                        - Unknown
+                    level: high
+                """
+            )
+        )
+        == [
+            r'''norm_id="WindowsSysmon" event_id IN [12, 13, 14]
+| process eval("target_object_contains=issubstr('System\CurrentControlSet\Services\VSS', target_object) || match(target_object, '(?i)e.* JAB')")
+| search target_object_contains="true" "process"="*esentutl.exe" -target_object="*System\CurrentControlSet\Services\VSS\Start*"'''
         ]
     )

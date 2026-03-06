@@ -16,7 +16,7 @@ from sigma.conversion.deferred import (
 )
 from sigma.conversion.state import ConversionState
 from sigma.correlations import SigmaCorrelationRule
-from sigma.rule import SigmaRule
+from sigma.rule import SigmaRule, SigmaDetectionItem
 from sigma.types import (
     SigmaCompareExpression,
     SpecialChars,
@@ -140,6 +140,7 @@ class Logpoint(TextQueryBackend):
     and_token: ClassVar[str] = " "
     not_token: ClassVar[str] = "-"
     eq_token: ClassVar[str] = "="
+    not_eq_token: ClassVar[str] = "!="
 
     field_quote: ClassVar[str] = '"'
     field_quote_pattern: ClassVar[Pattern] = re.compile(r"^[\w.]+$")
@@ -205,7 +206,7 @@ class Logpoint(TextQueryBackend):
     )
 
     # String used as separator between main query and deferred parts
-    deferred_start: ClassVar[str] = "| "
+    deferred_start: ClassVar[str] = "{pre_filter}\n| "
     # String used to join multiple deferred query parts
     deferred_separator: ClassVar[str] = " \n| "
     # String used as query if final query only contains deferred expression
@@ -245,6 +246,8 @@ class Logpoint(TextQueryBackend):
 
     def _check_all_contains(self, args):
         for field_equal_value_expr in args:
+            if not isinstance(field_equal_value_expr.value, SigmaString):
+                return False
             sig_string = cast(SigmaString, field_equal_value_expr.value)
             if not (
                 sig_string.startswith(SpecialChars.WILDCARD_MULTI)
@@ -289,10 +292,6 @@ class Logpoint(TextQueryBackend):
     ) -> Union[str, DeferredQueryExpression]:
         """Conversion of field in value list conditions.
         Overwrite for deferring the contains into eval."""
-        if self.field_in_list_expression is None or self.list_separator is None:
-            raise NotImplementedError(
-                "Field in list expressions are not supported by the backend"
-            )
         if not all(
             isinstance(arg, ConditionFieldEqualsValueExpression) for arg in cond.args
         ):  # All arguments must be field equals value expressions, legitimates casts below
@@ -320,29 +319,7 @@ class Logpoint(TextQueryBackend):
             )
             return super().convert_condition_field_eq_val_str(cond_true, state)
 
-        return self.field_in_list_expression.format(
-            field=self.escape_and_quote_field(
-                field_name
-            ),  # The assumption that the field is the same for all argument is valid because this is checked before
-            op=(
-                self.or_in_operator
-                if isinstance(cond, ConditionOR)
-                else self.and_in_operator
-            ),
-            list=self.list_separator.join(
-                [
-                    (
-                        self.convert_value_str(val, state)
-                        if isinstance(
-                            val := cast(ConditionFieldEqualsValueExpression, arg).value,
-                            SigmaString,
-                        )  # string escaping and qouting
-                        else str(val)
-                    )  # value is number
-                    for arg in cond.args
-                ]
-            ),
-        )
+        return super().convert_condition_as_in_expression(cond, state)
 
     def convert_condition_field_eq_val_re(
         self,
@@ -518,8 +495,47 @@ class Logpoint(TextQueryBackend):
                 )
             if isinstance(query, DeferredQueryExpression):
                 query = self.deferred_only_query
+
+            # Extract the pipeline added ADD-condition in front of the deferred expression. It can reduce the search space.
+            pre_filter_conditions = []
+            for key, sigma_detection in rule.detection.detections.items():
+                if key.startswith("_cond_"):
+                    item: SigmaDetectionItem = sigma_detection.detection_items[0]
+                    field_name = item.field
+                    values = item.value
+                    expr = (
+                        self.field_in_list_expression.format(
+                            field=self.escape_and_quote_field(field_name),
+                            # The assumption that the field is the same for all argument is valid because this is checked before
+                            op=self.or_in_operator,
+                            list=self.list_separator.join(
+                                [
+                                    (
+                                        self.convert_value_str(val, state)
+                                        if isinstance(
+                                            val,
+                                            SigmaString,
+                                        )  # string escaping and qouting
+                                        else str(val)
+                                    )  # value is number
+                                    for val in values
+                                ]
+                            ),
+                        )
+                        if len(item.value) > 1
+                        else self.eq_expression.format(
+                            field=self.escape_and_quote_field(item.field),
+                            value=self.convert_value_str(item.value[0], state),
+                            backend=self,
+                        )
+                    )
+                    pre_filter_conditions.append(expr)
+                    query = query.replace(
+                        expr, ""
+                    )  # Remove from main query for pre-filter
+
             query = (
-                self.deferred_start
+                self.deferred_start.format(pre_filter=" ".join(pre_filter_conditions))
                 + self.deferred_separator.join(
                     (
                         deferred_expression.finalize_expression()
@@ -527,11 +543,7 @@ class Logpoint(TextQueryBackend):
                     )
                 )
                 + "\n| search "
-                + self.query_expression.format(
-                    query=query,
-                    rule=rule,
-                    state=conversion_state,
-                )
+                + query.strip()
             )
             # Resets
             LogpointDeferredRegularExpression.reset()
