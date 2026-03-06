@@ -384,7 +384,8 @@ def test_logpoint_regex_query(logpoint_backend: Logpoint):
         """
     )
     assert logpoint_backend.convert(rule) == [
-        '''| process regex("(?P<fieldA_match>foo.*bar)", fieldA)
+        '''
+| process regex("(?P<fieldA_match>foo.*bar)", fieldA)
 | process eval("fieldA_condition=case(isnotnull(fieldA_match) -> 'true', 'false')")
 | search fieldA_condition="true" fieldB="foo"'''
     ]
@@ -405,7 +406,8 @@ def test_logpoint_regex_query_single(logpoint_backend: Logpoint):
         """
     )
     assert logpoint_backend.convert(rule) == [
-        '''| process regex("(?P<fieldA_match>foo.*bar)", fieldA)
+        '''
+| process regex("(?P<fieldA_match>foo.*bar)", fieldA)
 | process eval("fieldA_condition=case(isnotnull(fieldA_match) -> 'true', 'false')")
 | search fieldA_condition="true"'''
     ]
@@ -427,7 +429,8 @@ def test_logpoint_regex_query_or(logpoint_backend: Logpoint):
         """
     )
     assert logpoint_backend.convert(rule) == [
-        '''| process regex("(?P<fieldA_match>foo.*bar)", fieldA)
+        '''
+| process regex("(?P<fieldA_match>foo.*bar)", fieldA)
 | process eval("fieldA_condition=case(isnotnull(fieldA_match) -> \'true\', \'false\')") 
 | process regex("(?P<fieldB_match>abc.*xyz)", fieldB)
 | process eval("fieldB_condition=case(isnotnull(fieldB_match) -> \'true\', \'false\')")
@@ -452,7 +455,8 @@ def test_logpoint_regex_query_or_single_field(logpoint_backend: Logpoint):
         """
     )
     assert logpoint_backend.convert(rule) == [
-        '''| process regex("(?P<fieldA_match>foo.*bar)", fieldA)
+        '''
+| process regex("(?P<fieldA_match>foo.*bar)", fieldA)
 | process eval("fieldA_condition=case(isnotnull(fieldA_match) -> 'true', 'false')") 
 | process regex("(?P<fieldA_match2>abc.*xyz)", fieldA)
 | process eval("fieldA_condition2=case(isnotnull(fieldA_match2) -> 'true', 'false')")
@@ -476,7 +480,8 @@ def test_logpoint_regex_query_and(logpoint_backend: Logpoint):
         """
     )
     assert logpoint_backend.convert(rule) == [
-        '''| process regex("(?P<fieldA_match>foo.*bar)", fieldA)
+        '''
+| process regex("(?P<fieldA_match>foo.*bar)", fieldA)
 | process eval("fieldA_condition=case(isnotnull(fieldA_match) -> 'true', 'false')") 
 | process regex("(?P<fieldB_match>abc.*xyz)", fieldB)
 | process eval("fieldB_condition=case(isnotnull(fieldB_match) -> 'true', 'false')")
@@ -501,7 +506,8 @@ def test_logpoint_regex_query_escaped_input(logpoint_backend: Logpoint):
         """
     )
     assert logpoint_backend.convert(rule) == [
-        r'''| process regex("(?P<fieldA_match>127\.0\.0\.1:[1-9]\d{3})", fieldA)
+        r'''
+| process regex("(?P<fieldA_match>127\.0\.0\.1:[1-9]\d{3})", fieldA)
 | process eval("fieldA_condition=case(isnotnull(fieldA_match) -> 'true', 'false')") 
 | process regex("(?P<fieldC_match>foo/bar)", fieldC)
 | process eval("fieldC_condition=case(isnotnull(fieldC_match) -> 'true', 'false')")
@@ -527,7 +533,8 @@ def test_logpoint_regex_query_not(logpoint_backend: Logpoint):
         """
     )
     assert logpoint_backend.convert(rule) == [
-        r'''| process regex("(?P<fieldA_match>127\.0\.0\.1:[1-9]\d{3})", fieldA)
+        r'''
+| process regex("(?P<fieldA_match>127\.0\.0\.1:[1-9]\d{3})", fieldA)
 | process eval("fieldA_condition=case(isnotnull(fieldA_match) -> 'true', 'false')") 
 | process regex("(?P<fieldC_match>foo.*bar)", fieldC)
 | process eval("fieldC_condition=case(isnotnull(fieldC_match) -> 'true', 'false')")
