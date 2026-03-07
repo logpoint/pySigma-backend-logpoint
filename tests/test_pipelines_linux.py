@@ -22,7 +22,7 @@ def test_logpoint_linux_auditd():
                 """
             )
         )
-        == ['event_type="EXECVE" command="/usr/bin/test" user_id=1000']
+        == ['event_type="EXECVE" command="/usr/bin/test" audit_user_id=1000']
     )
 
 

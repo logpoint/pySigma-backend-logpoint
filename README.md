@@ -10,6 +10,7 @@ Further, it contains the processing pipieline `sigma.pipelines.logpoint`, which 
 The `sigma.pipelines.logpoint module` includes the following processing pipelines:
 
 * `logpoint_windows`: This pipeline is designed to convert Sigma rules into queries specifically tailored for the Windows event logging format used by Logpoint.
+* `logpoint_linux`: This pipeline is designed to convert Sigma rules into queries specifically tailored for the Linux event logging format used by Logpoint.
 
 ## Rule Support
 The Logpoint backend supports the following log sources/rule types:
@@ -18,6 +19,7 @@ The Logpoint backend supports the following log sources/rule types:
 - **Windows**
 - **Azure**
 - **M365**
+- **Linux**
 
 ## Usage example
 
