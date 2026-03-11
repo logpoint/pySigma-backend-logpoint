@@ -10,6 +10,7 @@ Further, it contains the processing pipieline `sigma.pipelines.logpoint`, which 
 The `sigma.pipelines.logpoint module` includes the following processing pipelines:
 
 * `logpoint_windows`: This pipeline is designed to convert Sigma rules into queries specifically tailored for the Windows event logging format used by Logpoint.
+* `logpoint_linux`: This pipeline is designed to convert Sigma rules into queries specifically tailored for the Linux event logging format used by Logpoint.
 * `logpoint_azure`: This pipeline is designed to convert Sigma rules into queries specifically tailored for the Azure event logging format used by Logpoint
 * `logpoint_o365`: This pipeline is designed to convert Sigma rules into queries specifically tailored for the Office 365 event logging format used by Logpoint
 * `logpoint_defer_contains`: This pipeline defer the Sigma `contains` keyword into eval expression. Useful when default query can't fetch the events and results in search timeout due to large number of wildcard searches. This optional pipeline can be used with in addition to other logpoint pipelines.
@@ -21,6 +22,7 @@ The Logpoint backend supports the following log sources/rule types:
 - **Windows**
 - **Azure**
 - **M365**
+- **Linux**
 
 ## Usage example
 
