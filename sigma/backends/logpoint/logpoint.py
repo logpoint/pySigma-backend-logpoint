@@ -1,6 +1,6 @@
 import re
-from typing import ClassVar, Dict, List, Optional, Pattern, Tuple, Union, Any
-
+from typing import ClassVar, Dict, List, Optional, Pattern, Tuple, Union, Any, cast
+from collections import ChainMap
 from sigma.conditions import (
     ConditionItem,
     ConditionAND,
@@ -16,7 +16,7 @@ from sigma.conversion.deferred import (
 )
 from sigma.conversion.state import ConversionState
 from sigma.correlations import SigmaCorrelationRule
-from sigma.rule import SigmaRule
+from sigma.rule import SigmaRule, SigmaDetectionItem
 from sigma.types import (
     SigmaCompareExpression,
     SpecialChars,
@@ -70,6 +70,46 @@ class LogpointDeferredRegularExpression(DeferredTextQueryExpression):
         cls.field_count = {}
 
 
+class LogpointDeferredContainsExpression(DeferredTextQueryExpression):
+    field_count = {}
+    default_field = "msg"
+    operators = {True: "!=", False: "="}
+
+    def __init__(self, state, field, arg):
+        self.add_field(field)
+        field_contains = self.get_field_contains(field)
+        self.template = 'process eval("{field_contains}={{value}}")'.format(
+            field_contains=field_contains
+        )
+        super().__init__(state, field, arg)
+
+    @classmethod
+    def add_field(cls, field):
+        cls.field_count[field] = (
+            cls.field_count.get(field, 0) + 1
+        )  # increment the field count
+
+    @classmethod
+    def get_field_suffix(cls, field):
+        index_suffix = cls.field_count.get(field, "")
+        if index_suffix == 1:
+            index_suffix = ""
+        return index_suffix
+
+    @classmethod
+    def construct_field_variable(cls, field, variable):
+        index_suffix = cls.get_field_suffix(field)
+        return f"{field}_{variable}{index_suffix}"
+
+    @classmethod
+    def get_field_contains(cls, field):
+        return cls.construct_field_variable(field, "contains")
+
+    @classmethod
+    def reset(cls):
+        cls.field_count = {}
+
+
 class Logpoint(TextQueryBackend):
     """
     Logpoint search query language backend.
@@ -100,6 +140,7 @@ class Logpoint(TextQueryBackend):
     and_token: ClassVar[str] = " "
     not_token: ClassVar[str] = "-"
     eq_token: ClassVar[str] = "="
+    not_eq_token: ClassVar[str] = "!="
 
     field_quote: ClassVar[str] = '"'
     field_quote_pattern: ClassVar[Pattern] = re.compile(r"^[\w.]+$")
@@ -131,6 +172,8 @@ class Logpoint(TextQueryBackend):
         SigmaCompareExpression.CompareOperators.GTE: ">=",
     }
 
+    field_exists_expression = "{field}=*"
+    field_not_exists_expression = "-{field}=*"
     field_null_expression: ClassVar[str] = "{field}!=*"
 
     # Field value in list, e.g. "field in (value list)" or "field containsall (value list)"
@@ -163,11 +206,16 @@ class Logpoint(TextQueryBackend):
     )
 
     # String used as separator between main query and deferred parts
-    deferred_start: ClassVar[str] = "| "
+    deferred_start: ClassVar[str] = "{pre_filter}\n| "
     # String used to join multiple deferred query parts
     deferred_separator: ClassVar[str] = " \n| "
     # String used as query if final query only contains deferred expression
     deferred_only_query: ClassVar[str] = ""
+
+    regex_metacharacters = [".", "^", "$", "+", "{", "}", "[", "]", "(", ")", "|", "\\"]
+    # Temporary placeholder strings
+    BACKSLASH_WILDCARD = "BACKSLASH_WILDCARD"
+    BACKSLASH_OPTION = "BACKSLASH_OPTION"
 
     def __init__(
         self,
@@ -188,6 +236,90 @@ class Logpoint(TextQueryBackend):
             "in",
             "or",
         ]
+
+        # Mark the presence of logpoint_defer_contains pipeline
+        self.defer_contains = False
+        if processing_pipeline is not None:
+            for processing_items in processing_pipeline.items:
+                if processing_items.identifier == "marker_defer_contains":
+                    self.defer_contains = True
+
+    def _check_all_contains(self, args):
+        for field_equal_value_expr in args:
+            if not isinstance(field_equal_value_expr.value, SigmaString):
+                return False
+            sig_string = cast(SigmaString, field_equal_value_expr.value)
+            if not (
+                sig_string.startswith(SpecialChars.WILDCARD_MULTI)
+                and sig_string.endswith(SpecialChars.WILDCARD_MULTI)
+            ):
+                return False
+        return True
+
+    def _convert_condition_field_in_values_eval(
+        self, cond: ConditionOR, state: ConversionState
+    ) -> str:
+        """Results in eval expression with issubstr and match functions for substring and wildcard respectively."""
+        items = []
+        field = cond.args[0].field
+        for expr in cond.args:
+            value = cast(SigmaString, expr.value)
+            value = value[1:-1]
+            value_str = str(value)
+            if not value.contains_special():
+                # Use substring search
+                value_str = value_str.replace("\\*", "*").replace("\\?", "?")
+                items.append(f"issubstr('{value_str}', {field})")
+            else:
+                # Wildcard -> Regex -> Use match
+                value_str = value_str.replace("\\*", self.BACKSLASH_WILDCARD).replace(
+                    "\\?", self.BACKSLASH_OPTION
+                )
+
+                for metacharacter in self.regex_metacharacters:
+                    value_str = value_str.replace(metacharacter, f"\\{metacharacter}")
+
+                value_str = value_str.replace("*", ".*").replace("?", ".")
+                value_str = value_str.replace(self.BACKSLASH_WILDCARD, "\\*").replace(
+                    self.BACKSLASH_OPTION, "\\?"
+                )
+                items.append(f"match({field}, '(?i){value_str}')")
+
+        return " || ".join(items)
+
+    def convert_condition_as_in_expression(
+        self, cond: Union[ConditionOR, ConditionAND], state: ConversionState
+    ) -> Union[str, DeferredQueryExpression]:
+        """Conversion of field in value list conditions.
+        Overwrite for deferring the contains into eval."""
+        if not all(
+            isinstance(arg, ConditionFieldEqualsValueExpression) for arg in cond.args
+        ):  # All arguments must be field equals value expressions, legitimates casts below
+            raise TypeError(
+                "Field in list expression requires all arguments to be ConditionFieldEqualsValueExpression"
+            )
+        field_name = cast(ConditionFieldEqualsValueExpression, cond.args[0]).field
+        if {
+            cast(ConditionFieldEqualsValueExpression, arg).field for arg in cond.args
+        } != {field_name}:
+            raise ValueError(
+                "Field in list expression requires all fields to be the same"
+            )
+
+        if self.defer_contains and self._check_all_contains(cond.args):
+            LogpointDeferredContainsExpression(
+                state,
+                field_name,
+                self._convert_condition_field_in_values_eval(cond, state),
+            ).postprocess(None, cond)
+
+            cond_true = ConditionFieldEqualsValueExpression(
+                LogpointDeferredContainsExpression.get_field_contains(field_name),
+                SigmaString("true"),
+            )
+            return super().convert_condition_field_eq_val_str(cond_true, state)
+
+        return super().convert_condition_as_in_expression(cond, state)
 
     def convert_condition_field_eq_val_re(
         self,
@@ -354,29 +486,74 @@ class Logpoint(TextQueryBackend):
         Finish query by appending deferred query parts to the main conversion result as specified
         with deferred_start and deferred_separator.
         """
-        if isinstance(query, DeferredQueryExpression):
-            query = self.deferred_only_query
+        conversion_state = ChainMap(state.processing_state, self.state_defaults)  # type: ignore
 
         if state.has_deferred():
-            deferred_regex_expressions = []
-            remaining_deferred = []
-
-            for deferred_expression in state.deferred:
-                if isinstance(deferred_expression, LogpointDeferredRegularExpression):
-                    deferred_regex_expressions.append(
-                        deferred_expression.finalize_expression()
-                    )
-                else:
-                    remaining_deferred.append(deferred_expression)
-
-            if deferred_regex_expressions:
-                LogpointDeferredRegularExpression.reset()
-                state.deferred[:] = remaining_deferred
-                query = (
-                    self.deferred_start
-                    + self.deferred_separator.join(deferred_regex_expressions)
-                    + "\n| search "
-                    + query
+            if self.deferred_start is None or self.deferred_separator is None:
+                raise NotImplementedError(
+                    "Deferred query parts are not supported by the backend."
                 )
+            if isinstance(query, DeferredQueryExpression):
+                query = self.deferred_only_query
 
-        return super().finish_query(rule, query, state)
+            # Extract the pipeline added ADD-condition in front of the deferred expression. It can reduce the search space.
+            pre_filter_conditions = []
+            for key, sigma_detection in rule.detection.detections.items():
+                if key.startswith("_cond_"):
+                    item: SigmaDetectionItem = sigma_detection.detection_items[0]
+                    field_name = item.field
+                    values = item.value
+                    expr = (
+                        self.field_in_list_expression.format(
+                            field=self.escape_and_quote_field(field_name),
+                            # The assumption that the field is the same for all argument is valid because this is checked before
+                            op=self.or_in_operator,
+                            list=self.list_separator.join(
+                                [
+                                    (
+                                        self.convert_value_str(val, state)
+                                        if isinstance(
+                                            val,
+                                            SigmaString,
+                                        )  # string escaping and qouting
+                                        else str(val)
+                                    )  # value is number
+                                    for val in values
+                                ]
+                            ),
+                        )
+                        if len(item.value) > 1
+                        else self.eq_expression.format(
+                            field=self.escape_and_quote_field(item.field),
+                            value=self.convert_value_str(item.value[0], state),
+                            backend=self,
+                        )
+                    )
+                    pre_filter_conditions.append(expr)
+                    query = query.replace(
+                        expr, ""
+                    )  # Remove from main query for pre-filter
+
+            query = (
+                self.deferred_start.format(pre_filter=" ".join(pre_filter_conditions))
+                + self.deferred_separator.join(
+                    (
+                        deferred_expression.finalize_expression()
+                        for deferred_expression in state.deferred
+                    )
+                )
+                + "\n| search "
+                + query.strip()
+            )
+            # Resets
+            LogpointDeferredRegularExpression.reset()
+            LogpointDeferredContainsExpression.reset()
+            self.defer_contains = False
+        else:
+            query = self.query_expression.format(
+                query=query,
+                rule=rule,
+                state=conversion_state,
+            )
+
+        return query
