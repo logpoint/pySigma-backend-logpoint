@@ -21,7 +21,8 @@ from sigma.types import (
     SigmaCompareExpression,
     SpecialChars,
     SigmaString,
-    Placeholder,
+    Placeholder, SigmaCasedString, SigmaTimestampPart, SigmaNumber, SigmaBool, SigmaRegularExpression,
+    SigmaCIDRExpression, SigmaFieldReference, SigmaNull, SigmaQueryExpression, SigmaExists, SigmaExpansion,
 )
 
 
@@ -213,6 +214,7 @@ class Logpoint(TextQueryBackend):
     deferred_only_query: ClassVar[str] = ""
 
     regex_metacharacters = [".", "^", "$", "+", "{", "}", "[", "]", "(", ")", "|", "\\"]
+    lp_null_values = ['-']  # Fields with these values are omitted in normalized fields.
     # Temporary placeholder strings
     BACKSLASH_WILDCARD = "BACKSLASH_WILDCARD"
     BACKSLASH_OPTION = "BACKSLASH_OPTION"
@@ -557,3 +559,43 @@ class Logpoint(TextQueryBackend):
             )
 
         return query
+
+    def convert_condition_field_eq_val(
+        self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
+    ) -> Any:
+        """Conversion dispatcher of field = value conditions. Dispatches to value-specific methods."""
+        match cond.value:
+            case SigmaCasedString():
+                return self.convert_condition_field_eq_val_str_case_sensitive(cond, state)
+            case SigmaString():
+                if cond.value.s[0] in self.lp_null_values:
+                    return self.convert_condition_field_eq_val_null(cond, state)
+                return self.convert_condition_field_eq_val_str(cond, state)
+            case SigmaTimestampPart():
+                return self.convert_condition_field_eq_val_timestamp_part(cond, state)
+            case SigmaNumber():
+                return self.convert_condition_field_eq_val_num(cond, state)
+            case SigmaBool():
+                return self.convert_condition_field_eq_val_bool(cond, state)
+            case SigmaRegularExpression():
+                return self.convert_condition_field_eq_val_re(cond, state)
+            case SigmaCIDRExpression():
+                return self.convert_condition_field_eq_val_cidr(cond, state)
+            case SigmaCompareExpression():
+                return self.convert_condition_field_compare_op_val(cond, state)
+            case SigmaFieldReference():
+                return self.convert_condition_field_eq_field(cond, state)
+            case SigmaNull():
+                return self.convert_condition_field_eq_val_null(cond, state)
+            case SigmaQueryExpression():
+                return self.convert_condition_field_eq_query_expr(cond, state)
+            case SigmaExists():
+                return self.convert_condition_field_eq_val_exists(cond, state)
+            case SigmaExpansion():
+                return self.convert_condition_field_eq_expansion(cond, state)
+            case _:  # pragma: no cover
+                raise TypeError(
+                    "Unexpected value type class in condition parse tree: "
+                    + cond.value.__class__.__name__
+                )
+
