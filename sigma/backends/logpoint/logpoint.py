@@ -580,7 +580,7 @@ class Logpoint(TextQueryBackend):
                     cond, state
                 )
             case SigmaString():
-                if cond.value.s[0] in self.lp_null_values:
+                if cond.value.original in self.lp_null_values:
                     return self.convert_condition_field_eq_val_null(cond, state)
                 return self.convert_condition_field_eq_val_str(cond, state)
             case SigmaTimestampPart():
