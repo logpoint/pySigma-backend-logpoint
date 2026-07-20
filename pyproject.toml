@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pysigma-backend-logpoint"
-version = "1.0.1"
+version = "1.0.2"
 description = "pySigma Logpoint backend"
 readme="README.md"
 authors = ["Surya Majhi <suryamajhi20@gmail.com>", "Swachchhanda Shrawan Poudel <swachchhandashrawan@gmail.com>"]
@@ -12,7 +12,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.10"
-pysigma = "^1.1.1"
+pysigma = "^1.4.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.4.2"
