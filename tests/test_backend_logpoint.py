@@ -150,7 +150,7 @@ def test_logpoint_in_expression_nullable_string(logpoint_backend: Logpoint):
                 condition: sel
         """
     )
-    assert logpoint_backend.convert(rule) == ['fieldA!=*']
+    assert logpoint_backend.convert(rule) == ["fieldA!=*"]
 
 
 def test_logpoint_field_name_with_whitespace(logpoint_backend: Logpoint):

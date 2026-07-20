@@ -21,8 +21,18 @@ from sigma.types import (
     SigmaCompareExpression,
     SpecialChars,
     SigmaString,
-    Placeholder, SigmaCasedString, SigmaTimestampPart, SigmaNumber, SigmaBool, SigmaRegularExpression,
-    SigmaCIDRExpression, SigmaFieldReference, SigmaNull, SigmaQueryExpression, SigmaExists, SigmaExpansion,
+    Placeholder,
+    SigmaCasedString,
+    SigmaTimestampPart,
+    SigmaNumber,
+    SigmaBool,
+    SigmaRegularExpression,
+    SigmaCIDRExpression,
+    SigmaFieldReference,
+    SigmaNull,
+    SigmaQueryExpression,
+    SigmaExists,
+    SigmaExpansion,
 )
 
 
@@ -214,7 +224,7 @@ class Logpoint(TextQueryBackend):
     deferred_only_query: ClassVar[str] = ""
 
     regex_metacharacters = [".", "^", "$", "+", "{", "}", "[", "]", "(", ")", "|", "\\"]
-    lp_null_values = ['-']  # Fields with these values are omitted in normalized fields.
+    lp_null_values = ["-"]  # Fields with these values are omitted in normalized fields.
     # Temporary placeholder strings
     BACKSLASH_WILDCARD = "BACKSLASH_WILDCARD"
     BACKSLASH_OPTION = "BACKSLASH_OPTION"
@@ -566,7 +576,9 @@ class Logpoint(TextQueryBackend):
         """Conversion dispatcher of field = value conditions. Dispatches to value-specific methods."""
         match cond.value:
             case SigmaCasedString():
-                return self.convert_condition_field_eq_val_str_case_sensitive(cond, state)
+                return self.convert_condition_field_eq_val_str_case_sensitive(
+                    cond, state
+                )
             case SigmaString():
                 if cond.value.s[0] in self.lp_null_values:
                     return self.convert_condition_field_eq_val_null(cond, state)
@@ -598,4 +610,3 @@ class Logpoint(TextQueryBackend):
                     "Unexpected value type class in condition parse tree: "
                     + cond.value.__class__.__name__
                 )
-
