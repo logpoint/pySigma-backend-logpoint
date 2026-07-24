@@ -135,6 +135,24 @@ def test_logpoint_in_expression_empty_string(logpoint_backend: Logpoint):
     assert logpoint_backend.convert(rule) == ['fieldA IN ["valueA", ""]']
 
 
+def test_logpoint_in_expression_nullable_string(logpoint_backend: Logpoint):
+    # In Logpoint '-' values are always escaped/removed.
+    rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA: '-'
+                condition: sel
+        """
+    )
+    assert logpoint_backend.convert(rule) == ["fieldA!=*"]
+
+
 def test_logpoint_field_name_with_whitespace(logpoint_backend: Logpoint):
     rule = SigmaCollection.from_yaml(
         """
