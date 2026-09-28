@@ -2,6 +2,8 @@ from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
 import pytest
 from sigma.backends.logpoint import Logpoint
 from sigma.collection import SigmaCollection
+from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
+from sigma.processing.transformations import AddConditionTransformation
 
 
 @pytest.fixture()
@@ -620,3 +622,28 @@ def test_logpoint_value_only_expr(logpoint_backend: Logpoint):
     )
 
     assert logpoint_backend.convert(rule) == ['"valueA" OR "20" OR "valueB"']
+
+
+def test_logpoint_regex_query_number_prefilter():
+    pipeline = ProcessingPipeline(
+        items=[ProcessingItem(AddConditionTransformation({"EventID": 15}))]
+    )
+    rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|re: foo.*bar
+                condition: sel
+        """
+    )
+    assert Logpoint(pipeline).convert(rule) == [
+        '''EventID=15
+| process regex("(?P<fieldA_match>foo.*bar)", fieldA)
+| process eval("fieldA_condition=case(isnotnull(fieldA_match) -> 'true', 'false')")
+| search fieldA_condition="true"'''
+    ]
