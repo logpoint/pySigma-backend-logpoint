@@ -537,7 +537,11 @@ class Logpoint(TextQueryBackend):
                         if len(item.value) > 1
                         else self.eq_expression.format(
                             field=self.escape_and_quote_field(item.field),
-                            value=self.convert_value_str(item.value[0], state),
+                            value=(
+                                self.convert_value_str(item.value[0], state)
+                                if isinstance(item.value[0], SigmaString)
+                                else str(item.value[0])
+                            ),
                             backend=self,
                         )
                     )
