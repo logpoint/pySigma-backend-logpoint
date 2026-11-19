@@ -64,7 +64,7 @@ logpoint_windows_sysmon_mapping = {
     "Configuration": "file",
     "CreationUtcTime": "creation_ts",
     "CurrentDirectory": "path",
-    "Description": "message",
+    "Description": "description",
     "DestinationHostname": "destination_host",
     "DestinationIp": "destination_address",
     "DestinationIsIpv6": "is_destination_ipv6",
