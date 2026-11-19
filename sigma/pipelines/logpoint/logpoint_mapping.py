@@ -2289,7 +2289,12 @@ logpoint_windows_service_control_manager_mapping = {
     7037: {"param1": "service", "param2": "configuration"},
     7038: {"param1": "service", "param2": "user", "param3": "reason"},
     7039: {"param1": "service", "param2": "target_process_id", "param3": "process_id"},
-    7040: {"param1": "service", "param2": "old_value", "param3": "new_value", "param4": "service_name"},
+    7040: {
+        "param1": "service",
+        "param2": "old_value",
+        "param3": "new_value",
+        "param4": "service_name",
+    },
     7041: {"param1": "service", "param2": "user"},
     7042: {
         "param1": "service",
