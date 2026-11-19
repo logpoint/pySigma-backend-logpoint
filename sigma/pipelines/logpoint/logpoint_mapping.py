@@ -2308,7 +2308,7 @@ logpoint_windows_service_control_manager_mapping = {
     },
     7043: {"Binary": "event_data", "param1": "service"},
     7045: {
-        "ImagePath": "path",
+        "ImagePath": "image_file",
         "ServiceName": "service",
         "ServiceType": "service_type",
         "StartType": "start_type",
